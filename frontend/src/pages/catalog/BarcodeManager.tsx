@@ -7,13 +7,15 @@ import { barcodeKeys, catalogKeys } from '../../lib/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../../components/ui/toastContext';
 import { PageHeader, Card, Button, Input, Badge, Skeleton, ErrorState } from '../../components/ui';
+import { BarcodeCamera, BarcodeLabel } from '../../components/BarcodeTools';
+import { hasPermission } from '../../auth/hasPermission';
 
 export default function BarcodeManager() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { user } = useAuthStore();
 
-  const hasEditPermission = user?.currentBusiness?.permissions?.includes('catalog.edit');
+  const hasEditPermission = hasPermission(user, 'catalog.edit');
 
   // -- Lookup State --
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +118,7 @@ export default function BarcodeManager() {
                     }
                   }}
                   placeholder="e.g. 123456789012"
-                  autoFocus
+                  autoFocus maxLength={128}
                 />
               </div>
               <Button
@@ -127,6 +129,7 @@ export default function BarcodeManager() {
                 Search
               </Button>
             </div>
+            <BarcodeCamera onDetected={value => { setInputValue(value); setSearchQuery(value); }} />
           </Card>
 
           {/* Results */}
@@ -149,9 +152,9 @@ export default function BarcodeManager() {
                   </p>
                   <div className="flex gap-3">
                     <Button variant="secondary" onClick={handleTryAgain}>Try Again</Button>
-                    <Link to="/catalog/items/new">
+                    {hasPermission(user, 'catalog.create') && <Link to="/catalog/items/new">
                       <Button icon={<Plus className="h-4 w-4"/>}>Create New Item</Button>
-                    </Link>
+                    </Link>}
                   </div>
                 </Card>
               ) : data ? (
@@ -182,6 +185,7 @@ export default function BarcodeManager() {
                     </div>
                   </div>
 
+                  {data.barcode && <BarcodeLabel key={data.barcode} value={data.barcode} name={data.name} />}
                   <div className="pt-4 mt-2 border-t border-[#E2E8E6] flex justify-end">
                     <Link to={`/catalog/items/${data.id}`}>
                       <Button variant="secondary">Open Item</Button>

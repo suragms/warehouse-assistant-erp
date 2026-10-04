@@ -19,10 +19,15 @@ namespace PurchaseAssistant.Infrastructure.Services
             _currentUser = currentUser;
         }
 
-        public async Task<List<BrokerDto>> GetAllAsync(CancellationToken cancellationToken = default)
+        public Task<List<BrokerDto>> GetAllAsync(CancellationToken cancellationToken = default) => SearchAsync(1, 1000, null, cancellationToken);
+
+        public async Task<List<BrokerDto>> SearchAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default)
         {
-            return await _context.Brokers.AsNoTracking()
-                .OrderBy(b => b.Name)
+            if (page is < 1 or > 10000 || pageSize is < 1 or > 1000 || search?.Length > 200) throw new ArgumentException("Invalid contact search or page.");
+            var query = _context.Brokers.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(search)) { var term = search.Trim(); query = query.Where(x => x.Name.Contains(term)); }
+            return await query
+                .OrderBy(b => b.Name).ThenBy(b => b.Id).Skip((page - 1) * pageSize).Take(pageSize)
                 .Select(brk => new BrokerDto
                 {
                     Id = brk.Id,

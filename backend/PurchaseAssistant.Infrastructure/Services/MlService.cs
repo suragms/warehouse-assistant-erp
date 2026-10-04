@@ -18,6 +18,10 @@ public record MlAnalysis(Guid ItemId, string ItemName, string Unit, [property: O
     List<HistoryPoint> History, List<ForecastPoint> Forecast, ReorderAdvice? Reorder, List<MovementAnomaly> Anomalies);
 public record PredictionOutcome(Guid Id, string ModelVersion, string InputVersion, DateTime CreatedAt, DateOnly StartDate, int Horizon,
     [property: OperationalNumeric] decimal PredictedQuantity, [property: OperationalNumeric] decimal? ActualQuantity, int ObservedDays);
+public record MonitoringSummary(string ModelVersion, int Horizon, int CompletedForecasts,
+    [property: OperationalNumeric] double Mae, [property: OperationalNumeric] double Rmse, [property: OperationalNumeric] double? Wape,
+    [property: OperationalNumeric] double? Mape, [property: OperationalNumeric] double RecentMae, [property: OperationalNumeric] double? PreviousMae,
+    bool ReviewAlert, string Message);
 
 public class MlService(AppDbContext db, ICurrentUserService user, ArtifactStore store, TimeProvider clock)
 {
@@ -29,8 +33,7 @@ public class MlService(AppDbContext db, ICurrentUserService user, ArtifactStore 
         var now = clock.GetUtcNow().UtcDateTime; var today = DateOnly.FromDateTime(now);
         var item = await db.CatalogItems.AsNoTracking().SingleOrDefaultAsync(x => x.BusinessId == Business && x.Id == itemId && x.IsActive, ct) ?? throw new KeyNotFoundException("Item not found.");
         var from = today.AddDays(-730);
-        var rows = await db.DailyUsageLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId && x.Date >= from && x.Date < today)
-            .OrderBy(x => x.Date).Take(1500).Select(x => new UsageObservation(x.Date, (double?)x.UsedQty, x.IsConfirmed, x.LoggedAt)).ToListAsync(ct);
+        var rows = (await UsageObservationReader.ReadAsync(db, Business, new Dictionary<Guid, string> { [itemId] = item.DefaultUnit }, from, today, ct))[itemId];
         var data = UsageData.Prepare(rows, today, now); var anomalies = await AnomaliesAsync(itemId, now, ct);
         var available = item.CurrentStock - item.ReservedStock;
         var history = data.Series.TakeLast(60).Select(x => new HistoryPoint(x.Date, x.Quantity)).ToList();
@@ -86,15 +89,33 @@ public class MlService(AppDbContext db, ICurrentUserService user, ArtifactStore 
         }
         return found.Take(50).ToList();
     }
-    public async Task<object> MonitoringAsync(Guid itemId, CancellationToken ct)
+    public async Task<List<PredictionOutcome>> MonitoringAsync(Guid itemId, CancellationToken ct)
     {
         Check(); if (!await db.CatalogItems.AnyAsync(x => x.Id == itemId && x.BusinessId == Business, ct)) throw new KeyNotFoundException();
-        var logs = await db.MlPredictionLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId).OrderByDescending(x => x.CreatedAt).Take(100).ToListAsync(ct);
-        var earliest = logs.Count == 0 ? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime) : logs.Min(x => x.StartDate);
-        var usage = await db.DailyUsageLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId && x.IsConfirmed && x.Date >= earliest).ToListAsync(ct);
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        var now = clock.GetUtcNow().UtcDateTime; var today = DateOnly.FromDateTime(now); var cutoff = today.AddDays(-730);
+        var logs = await db.MlPredictionLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId && x.StartDate >= cutoff).OrderByDescending(x => x.CreatedAt).Take(100).ToListAsync(ct);
+        var earliest = logs.Count == 0 ? today : logs.Min(x => x.StartDate);
+        var unit = await db.CatalogItems.Where(x => x.BusinessId == Business && x.Id == itemId).Select(x => x.DefaultUnit).SingleAsync(ct);
+        var rows = (await UsageObservationReader.ReadAsync(db, Business, new Dictionary<Guid, string> { [itemId] = unit }, earliest, today, ct))[itemId];
+        // Apply the same outcome validity rules used for training; never report partial or conflicting totals.
+        var usage = rows.Where(x => x.Confirmed && x.Quantity is >= 0 and <= 1_000_000_000 && double.IsFinite(x.Quantity.Value) && x.RecordedAt != default && x.RecordedAt <= now && DateOnly.FromDateTime(x.RecordedAt) == x.Date)
+            .GroupBy(x => x.Date).Where(g => g.Select(x => x.Quantity).Distinct().Count() == 1).Select(g => g.First()).ToList();
         return logs.Select(x => { var actual = usage.Where(y => y.Date >= x.StartDate && y.Date < x.StartDate.AddDays(x.Horizon) && y.Date < today).ToList();
             return new PredictionOutcome(x.Id, x.ModelVersion, x.InputVersion, x.CreatedAt, x.StartDate, x.Horizon, x.PredictedQuantity,
-                actual.Select(y => y.Date).Distinct().Count() == x.Horizon ? (decimal?)actual.Sum(y => y.UsedQty) : null, actual.Count); }).ToList();
+                actual.Select(y => y.Date).Distinct().Count() == x.Horizon ? (decimal?)actual.Sum(y => y.Quantity!.Value) : null, actual.Count); }).ToList();
+    }
+    public async Task<List<MonitoringSummary>> MonitoringSummaryAsync(Guid itemId, CancellationToken ct)
+    {
+        var outcomes = await MonitoringAsync(itemId, ct);
+        return outcomes.Where(x => x.ActualQuantity != null).GroupBy(x => new { x.ModelVersion, x.Horizon }).Select(group => {
+            var ordered = group.OrderByDescending(x => x.StartDate).ToList();
+            var metrics = ForecastModel.Evaluate(ordered.Select(x => (double)x.ActualQuantity!.Value).ToArray(), ordered.Select(x => (double)x.PredictedQuantity).ToArray());
+            var recent = ordered.Take(5).Average(x => (double)Math.Abs(x.PredictedQuantity - x.ActualQuantity!.Value));
+            double? previous = ordered.Count >= 10 ? ordered.Skip(5).Take(5).Average(x => (double)Math.Abs(x.PredictedQuantity - x.ActualQuantity!.Value)) : null;
+            var alert = previous != null && recent > previous * 1.5 + 1e-8;
+            return new MonitoringSummary(group.Key.ModelVersion, group.Key.Horizon, ordered.Count, metrics.Mae, metrics.Rmse, metrics.Wape, metrics.Mape,
+                recent, previous, alert, alert ? "Recent five completed forecast totals have over 50% greater MAE than the previous five. Review data and model; retraining is never automatic."
+                : previous == null ? "Ten complete forecasts of the same model and horizon are needed for a degradation comparison." : "No degradation threshold crossed. Overlapping horizons are correlated; this alert is a review rule, not a statistical confidence test.");
+        }).ToList();
     }
 }

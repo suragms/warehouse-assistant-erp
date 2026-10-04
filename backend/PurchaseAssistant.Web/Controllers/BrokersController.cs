@@ -19,9 +19,9 @@ namespace PurchaseAssistant.Web.Controllers
 
         [HttpGet]
         [Authorize(Policy = "RequireBrokerView")]
-        public async Task<ActionResult<List<BrokerDto>>> GetAll(CancellationToken cancellationToken = default)
+        public async Task<ActionResult<List<BrokerDto>>> GetAll(int page = 1, int pageSize = 1000, string? search = null, CancellationToken cancellationToken = default)
         {
-            return Ok(await _brokerService.GetAllAsync(cancellationToken));
+            return Ok(await _brokerService.SearchAsync(page, pageSize, search, cancellationToken));
         }
 
         [HttpGet("{id}")]

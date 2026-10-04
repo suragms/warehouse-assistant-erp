@@ -71,6 +71,6 @@ it('shows authorized child routes independently of a denied parent overview', ()
 });
 it('provides Arabic RTL steps only for permitted role guides and states unavailable actions accurately', () => {
   render(<MemoryRouter><HelpGuidePage /></MemoryRouter>);
-  const arabic = screen.getByText('المسح بالكاميرا والتعرف على الصور غير متاحين في تطبيق الويب هذا.').closest('[lang="ar"]'); expect(arabic).toHaveAttribute('dir', 'rtl');
+  const arabic = screen.getByText('استخدم الكاميرا في المتصفحات المدعومة أو أدخل الرمز يدوياً.').closest('[lang="ar"]'); expect(arabic).toHaveAttribute('dir', 'rtl');
   expect(screen.getByText('أدخل الكميات والأسعار، ثم راجع المعاينة قبل الحفظ.')).toBeInTheDocument();
 });

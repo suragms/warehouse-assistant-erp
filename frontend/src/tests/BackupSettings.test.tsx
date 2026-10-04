@@ -56,6 +56,6 @@ it('denies Staff export and does not request private history', () => {
   view(); expect(screen.getByRole('alert')).toHaveTextContent('Export access is unavailable'); expect(exportsApi.history).not.toHaveBeenCalled();
 });
 it('renders only supported role-aware Help actions', () => {
-  view(true); expect(screen.getByRole('heading', { name: 'How to use this app' })).toBeInTheDocument(); expect(screen.getByText('Camera scanning and photo recognition are not available in this web app.')).toBeInTheDocument();
+  view(true); expect(screen.getByRole('heading', { name: 'How to use this app' })).toBeInTheDocument(); expect(screen.getByText('Use Scan with camera in supported secure browsers; otherwise enter the code or use a USB scanner.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Try it · Export & Backup', hidden: true })).toHaveAttribute('href', '/settings/backup');
 });

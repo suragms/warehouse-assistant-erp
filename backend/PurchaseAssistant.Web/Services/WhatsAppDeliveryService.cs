@@ -31,7 +31,7 @@ public class WhatsAppDeliveryService(AppDbContext db, ICurrentUserService user, 
     {
         Authorize(); var order = await Order(id, ct); var settings = await Settings(ct);
         var delivery = await db.Set<PurchaseDelivery>().AsNoTracking().SingleOrDefaultAsync(x => x.BusinessId == Business && x.PurchaseId == id, ct);
-        return new { ready = settings.Ready, recipient = settings.Recipient, purchaseVersion = order.Version, eligible = order.Status is not (PurchaseStatus.Draft or PurchaseStatus.Cancelled), delivery };
+        return new { ready = settings.Ready, recipient = settings.Recipient, purchaseVersion = order.Version, eligible = order.Status is not (PurchaseStatus.Draft or PurchaseStatus.Cancelled), requiresVerification = RequiresVerification(delivery), delivery };
     }
     public async Task<PurchaseDelivery> Send(Guid id, DeliveryRequest request, CancellationToken ct)
     {
@@ -43,7 +43,7 @@ public class WhatsAppDeliveryService(AppDbContext db, ICurrentUserService user, 
         if (request.Recipient != settings.Recipient) throw new InvalidOperationException("Recipient changed. Reload the delivery preview.");
         var row = await db.Set<PurchaseDelivery>().SingleOrDefaultAsync(x => x.BusinessId == Business && x.PurchaseId == id, ct);
         if (row?.RequestId == request.RequestId || row?.Status == "accepted") return row;
-        if (row != null && (row.Version != request.DeliveryVersion || row.Status == "sending" || (row.Status == "unknown" && !request.VerifiedNotDelivered)))
+        if (row != null && (row.Version != request.DeliveryVersion || (row.Status == "sending" && !RequiresVerification(row)) || (RequiresVerification(row) && !request.VerifiedNotDelivered)))
             throw new InvalidOperationException("Delivery is in progress, changed, or has an unknown outcome. Verify its status with Meta before retrying.");
         // Quantity-only PDF: the configured staff recipient is never sent owner financial data.
         var bytes = ExportFileBuilder.Pdf(order.OrderNumber, order.Items.Select(x => $"{x.CatalogItem.Name} | {x.OrderedQuantity:0.####} {x.Unit}"));
@@ -85,6 +85,10 @@ public class WhatsAppDeliveryService(AppDbContext db, ICurrentUserService user, 
         using var persist = new CancellationTokenSource(TimeSpan.FromSeconds(10)); await db.SaveChangesAsync(persist.Token);
         return row;
     }
+    // A crashed worker cannot finalize its row. After more than twice the transport timeout,
+    // require an operator to verify the provider outcome before any explicit retry.
+    private static bool RequiresVerification(PurchaseDelivery? row) => row?.Status == "unknown"
+        || (row?.Status == "sending" && row.UpdatedAt < DateTime.UtcNow.AddMinutes(-2));
     private void Audit(PurchaseDelivery row, string action) => db.SecurityAuditLogs.Add(new() { BusinessId = Business, UserId = user.UserId, EventType = action,
         Description = "Purchase delivery status recorded.", MetadataJson = JsonSerializer.Serialize(new { row.PurchaseId, row.Status, row.RequestId, row.Attempts, row.ErrorCode }) });
 }

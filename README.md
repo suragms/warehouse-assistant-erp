@@ -2,10 +2,10 @@
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.x-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A modern, high-performance multi-tenant warehouse management and purchase lifecycle system designed for inventory control, automated purchasing workflows, real-time stock sync, and audit logging.
@@ -13,6 +13,17 @@ A modern, high-performance multi-tenant warehouse management and purchase lifecy
 Built with **ASP.NET Core (.NET 10)** following Clean Architecture principles on the backend and **React 19 + TypeScript + Vite + Tailwind CSS** on the frontend.
 
 ---
+
+
+## Current verification and ML
+
+Phase 3 is **YELLOW — Production Candidate**, not a production-deployment certification. See [current feature audit](docs/CURRENT_FEATURE_AUDIT_2026-10-03.md), [final feature matrix](docs/FINAL_PENDING_FEATURE_MATRIX_2026-10-03.md) and [validation/readiness report](docs/FINAL_PRODUCTION_READINESS_2026-10-03.md).
+
+The application now includes Predictions, supplier purchase/price history, owner audit history, broader notifications, authenticated password changes, provider policy controls, reviewed invoice-text extraction, owner-confirmed WhatsApp quantity PDFs, barcode labels and supported-browser camera lookup. External integrations still require configured accounts and deployment verification.
+
+The new `ml/` projects implement offline per-item confirmed-consumption training, baseline comparison and scoped serving. No eligible real history was supplied, so no production artifact or business-accuracy claim is included. Start with [ML architecture and commands](docs/ML_ARCHITECTURE_2026-10-03.md) and [model card](docs/ML_MODEL_CARD_2026-10-03.md). `scripts/verify-ml-reproducibility.ps1` checks synthetic mechanics only; never deploy its output. Configure the server's private `ML__ArtifactPath` only after reviewing real data and accepted metrics.
+
+Barcode labels use browser print/Save PDF; camera support is feature-detected and retains manual/USB input. The Tailwind 4 upgrade requires modern supported browsers (Safari 16.4+, Chrome 111+, Firefox 128+). One Business is one logical warehouse; branches/transfers are not implemented.
 
 ## 📑 Table of Contents
 
@@ -48,7 +59,7 @@ Built with **ASP.NET Core (.NET 10)** following Clean Architecture principles on
   - Idempotency middleware preventing duplicate order creation via `Idempotency-Key` headers.
   - Standardized RFC 7807 `ProblemDetails` error responses with correlation request IDs.
 - **Modern Responsive UI**:
-  - Dark/Light mode design crafted with Tailwind CSS and Lucide icons.
+  - Responsive light-theme interface built with Tailwind CSS and Lucide icons.
   - Optimistic mutations and automated cache invalidation via TanStack Query.
   - Client UI state managed through lightweight Zustand stores.
 

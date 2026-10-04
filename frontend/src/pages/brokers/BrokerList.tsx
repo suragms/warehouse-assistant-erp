@@ -6,8 +6,12 @@ import { catalogApi, type Broker } from '../../api/catalogApi';
 import { brokerKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Skeleton, ErrorState, ConfirmDialog, Modal, Input, Badge } from '../../components/ui';
 import { useToast } from '../../components/ui/toastContext';
+import { useAuthStore } from '../../stores/authStore';
+import { hasPermission } from '../../auth/hasPermission';
 
 export default function BrokerList() {
+  const user = useAuthStore(s => s.user);
+  const [search, setSearch] = useState(''); const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -24,8 +28,8 @@ export default function BrokerList() {
   const [brokerIdToDelete, setBrokerIdToDelete] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: brokerKeys.lists(),
-    queryFn: () => catalogApi.getBrokers(),
+    queryKey: [...brokerKeys.lists(), search, page],
+    queryFn: () => catalogApi.getBrokers({ search, page, pageSize: 50 }),
   });
 
   const saveMutation = useMutation({
@@ -95,11 +99,17 @@ export default function BrokerList() {
         title="Brokers"
         subtitle="Manage purchasing brokers and intermediaries"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={handleOpenNew}>New Broker</Button>
+          hasPermission(user, 'broker.create') && <Button icon={<Plus className="h-4 w-4" />} onClick={handleOpenNew}>New Broker</Button>
         }
       />
 
-      <Card className="overflow-hidden">
+      <div className="my-4 flex flex-wrap items-end gap-3">
+        <Input label="Search brokers" value={search} maxLength={200} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+        <Button variant="secondary" disabled={page === 1 || isLoading} onClick={() => setPage(p => p - 1)}>Previous</Button>
+        <span className="py-2 text-sm">Page {page}</span>
+        <Button variant="secondary" disabled={isLoading || !data || data.length < 50} onClick={() => setPage(p => p + 1)}>Next</Button>
+      </div>
+      <Card className="overflow-x-auto">
         {isLoading ? (
           <div className="p-4 space-y-4">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
@@ -125,12 +135,12 @@ export default function BrokerList() {
                     {b.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(b)}>
+                    {hasPermission(user, 'broker.edit') && <Button variant="ghost" size="sm" aria-label={`Edit ${b.name}`} onClick={() => handleOpenEdit(b)}>
                       <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setBrokerIdToDelete(b.id); setDeleteOpen(true); }}>
+                    </Button>}
+                    {hasPermission(user, 'broker.delete') && <Button variant="ghost" size="sm" aria-label={`Delete ${b.name}`} className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setBrokerIdToDelete(b.id); setDeleteOpen(true); }}>
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </Button>}
                   </td>
                 </tr>
               ))}

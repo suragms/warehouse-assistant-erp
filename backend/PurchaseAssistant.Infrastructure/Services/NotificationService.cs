@@ -27,10 +27,10 @@ namespace PurchaseAssistant.Infrastructure.Services
             var query = _context.Notifications.Where(n => n.UserId == userId);
             if (_user == null || _user.Role is "Owner" or "SuperAdmin") return query;
             bool stock = _user.HasPermission("stock.view"), purchase = _user.HasPermission("purchase.view"), staff = _user.HasPermission("users.view");
-            return query.Where(n => ((n.Type == NotificationType.LowStock || n.Type == NotificationType.OutOfStock || n.Type == NotificationType.StockVariance || n.ReferenceType == "MlPrediction") && stock)
+            return query.Where(n => ((n.Type == NotificationType.LowStock || n.Type == NotificationType.OutOfStock || n.Type == NotificationType.StockVariance || n.ReferenceType == "MlPrediction" || n.ReferenceType == "CatalogItem") && stock)
                 || (n.ReferenceType == "Membership" && staff)
-                || ((n.Type == NotificationType.PurchasePending || n.Type == NotificationType.VerificationRequired || n.Type == NotificationType.DeliveryPending) && purchase)
-                || (n.Type == NotificationType.System && n.ReferenceType != "MlPrediction" && n.ReferenceType != "Membership"));
+                || ((n.Type == NotificationType.PurchasePending || n.Type == NotificationType.VerificationRequired || n.Type == NotificationType.DeliveryPending || n.ReferenceType == "Purchase" || n.ReferenceType == "PurchaseOrder" || n.ReferenceType == "DamageReport") && purchase)
+                || (n.Type == NotificationType.System && n.ReferenceType != "MlPrediction" && n.ReferenceType != "Membership" && n.ReferenceType != "CatalogItem" && n.ReferenceType != "Purchase" && n.ReferenceType != "PurchaseOrder" && n.ReferenceType != "DamageReport"));
         }
 
         public async Task<PaginatedResult<NotificationDto>> GetNotificationsAsync(Guid userId, int page, int pageSize, bool onlyUnread)

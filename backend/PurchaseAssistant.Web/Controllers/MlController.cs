@@ -33,4 +33,6 @@ public class MlController(MlService ml, AppDbContext db, ICurrentUserService use
     }
     [HttpGet("items/{id:guid}/monitoring")]
     public async Task<IActionResult> Monitoring(Guid id, CancellationToken ct) { Response.Headers.CacheControl = "private, no-store"; return Ok(await ml.MonitoringAsync(id, ct)); }
+    [HttpGet("items/{id:guid}/monitoring-summary")]
+    public async Task<IActionResult> MonitoringSummary(Guid id, CancellationToken ct) { Response.Headers.CacheControl = "private, no-store"; return Ok(await ml.MonitoringSummaryAsync(id, ct)); }
 }

@@ -654,6 +654,101 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.ToTable("DailyUsageLogs");
                 });
 
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.HistoricalUsageBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ImportedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RawCsv")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "FileHash")
+                        .IsUnique();
+
+                    b.ToTable("HistoricalUsageBatches");
+                });
+
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.HistoricalUsageRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CatalogItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(20, 4)
+                        .HasColumnType("numeric(20,4)");
+
+                    b.Property<DateTime>("SourceRecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "BatchId");
+
+                    b.HasIndex("BusinessId", "CatalogItemId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("HistoricalUsageRows", t =>
+                        {
+                            t.HasCheckConstraint("CK_HistoricalUsage_Quantity", "\"Quantity\" >= 0 AND \"Quantity\" <= 1000000000");
+                        });
+                });
+
             modelBuilder.Entity("PurchaseAssistant.Domain.Entities.Membership", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1755,6 +1850,32 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Navigation("CatalogItem");
 
                     b.Navigation("LoggedByUser");
+                });
+
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.HistoricalUsageBatch", b =>
+                {
+                    b.HasOne("PurchaseAssistant.Domain.Entities.Business", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.HistoricalUsageRow", b =>
+                {
+                    b.HasOne("PurchaseAssistant.Domain.Entities.HistoricalUsageBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "BatchId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("PurchaseAssistant.Domain.Entities.Membership", b =>

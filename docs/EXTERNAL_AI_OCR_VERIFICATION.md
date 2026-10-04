@@ -1,37 +1,29 @@
-# External AI and OCR Verification — 2026-10-03
+# External integration verification — Phase 3
 
-## Exact status
+Updated 2026-10-04. Automated contract tests are not live provider evidence. No live AI, OCR, voice, email or WhatsApp credentials were supplied or printed, and no external message was sent.
 
-### Purchase-intent AI
+## AI purchase intent and invoice text
 
-Target integration is implemented for text purchase intent through OpenRouter, Gemini, Groq and OpenAI adapters, with encrypted active-business keys, optional server fallback, ordered failover, normalized failures, request timeout, and an authenticated/rate-limited endpoint. The user must review candidates; the service cannot create or commit a purchase. Automated tests use mocked handlers and fake providers.
+Implemented adapters: OpenRouter, Gemini, Groq and OpenAI, with encrypted tenant keys, optional server fallback, provider/model policy, timeouts, bounded retry and circuit breaker. Purchase-intent and pasted-invoice extraction only return candidates for review. Deterministic invoice parsing works without a provider.
 
-**Unverified externally:** credential acceptance, DNS/TLS/network egress from the deployment, model availability, quota/rate behavior, provider billing, real response shape/quality, end-to-end latency under account load, and the actual production key-ring setup. No credentials were supplied or accessed. No secret is requested or included in this repository.
+Remaining staging checks: configure an approved test account through owner credential settings or the secret store; verify masked save, restart/shared-key-ring decryption, supported model, valid parse, invalid/missing key, quota/timeout/fallback behavior, request authorization, actual latency and output quality, data retention/region terms and spend limits. Record provider/model/date/results without secrets or real purchase text.
 
-### OCR / image / voice
+## WhatsApp delivery
 
-There is no current main-app OCR/image/voice provider integration or API. Current reference revision drops the old scan tables in `reference-repo/backend/alembic/versions/066_drop_scan_and_whatsapp.py` and explicitly removes `purchase_scan_traces` and `catalog_aliases` in `reference-repo/backend/sql/066_drop_scan_and_whatsapp.sql`. Older parity documentation is stale for this feature. No external OCR call can be verified because there is no live target code path or provider contract.
+The target now has a real, locally tested outbound path. Set `WhatsApp__Enabled=true` and `WhatsApp__GraphVersion` to an account-supported version (for example the `vNN.0` format, not an assumed hardcoded version). Save `whatsapp_api_key`, `whatsapp_phone_number_id` and `whatsapp_staff_number` using the encrypted credential UI. The recipient must be reviewed and confirmed on the current purchase before sending.
 
-### WhatsApp
+The fixed HTTPS Graph host receives a PDF media upload and document-send request. Redirects are disabled; request logging is removed for this client; 45-second transport and 64KB response bounds apply. PDFs contain item names, quantities and units, without prices or financial totals. Provider acceptance is recorded as `accepted`, not verified recipient delivery. A duplicate request ID or accepted purchase does not resend. Known rejections are retryable explicitly; ambiguous outcomes and stale interrupted sends require the owner to verify in Meta that nothing was sent before retrying. A sending request within two minutes cannot be retried. Persistent version/unique constraints guard concurrent sends. There is no automatic retry or unverified delivery webhook.
 
-The main app currently has allowlisted WhatsApp credential fields only. It has no outbound send, opt-in/consent, webhook, delivery state, retry, template or external delivery API. Current reference history also removes WhatsApp fields and has no active delivery router at this revision. Credential presence alone is not delivery integration.
+Remaining external checks: approved business/phone/token permissions, recipient opt-in, account messaging-window/template requirements, selected Graph version, document delivery, network/quota limits and operator recovery procedure. No template campaign or push-message system is claimed. Contract source: [Meta WhatsApp Cloud API collection](https://www.postman.com/meta/whatsapp-business-platform/documentation/wlk6lh4/whatsapp-cloud-api?entity=request-13382743-06605a2c-2b74-4d0a-a035-2c227eae61d1).
 
-## Safe automated evidence
+## Image OCR, voice and account recovery
 
-- Provider request serialization and authorization header handling are tested with an in-process handler.
-- Business credential resolution, server fallback, missing-key skip, failover, malformed provider output, timeout and normalized errors are covered with test doubles where the relevant tests exist.
-- API-key values are returned neither by settings responses nor logs. Provider exception bodies and request prompts are not logged.
-- Current business authorization precedes purchase-intent parsing; supplier and catalog context comes from tenant-scoped application services.
-- After the Phase 2 missing-credential fix, a provider with an empty key is skipped before HTTP dispatch. This is code-path validation, not account validation.
+The reference `/media/ocr` path handles pasted/plain text, including base64 decoded as UTF-8; it does not establish a functioning image OCR contract. Target invoice text parity is implemented. Actual image OCR, voice transcription and email/SMS password-recovery delivery remain unavailable until an approved adapter/provider and operating contract exist. Authenticated password changes and session revocation are implemented. Recovery endpoints remain explicitly unavailable and do not reveal account existence or mint usable reset tokens.
 
-## Staging verification needed for AI
+## Camera and printing
 
-An operator with an approved non-production provider account should configure a key through the owner settings UI or deployment secret store, then verify: save/masked status; restart/key-ring decrypt; exact supported model; one valid parse with synthetic data; invalid key; missing key; quota/rate response; timeout; malformed upstream response; sequential fallback; no secret in app/proxy/provider logs; correct authorization and tenant context; actual data-retention/region terms; and spend limits. Revoke/rotate the test key at the end. Record provider/model/date and result without recording the key or real purchase prompt.
+Barcode camera lookup is local to supported secure browsers; frames are not uploaded. Permission denial/unsupported browsers retain typed/USB lookup, and streams stop on completion, cancellation and unmount. Barcode labels use locally bundled [JsBarcode](https://github.com/lindell/JsBarcode) Code 128 and browser print/Save PDF. Browser automation verifies generated bars, print visibility and fallback/denial, not physical camera or scanner accuracy. [BarcodeDetector availability](https://developer.mozilla.org/en-US/docs/Web/API/BarcodeDetector) varies by browser. Physical camera, printer, scanner, keyboard and installed-PWA checks require devices.
 
-## Staging verification needed before OCR or WhatsApp work
+## Deployment qualification
 
-First approve the feature contract and data-minimization rules. OCR needs supported file/media formats, size limits, consent, retention/deletion, extraction schema, confidence/error behavior and a manual correction path. WhatsApp needs opt-in evidence, templates, recipient selection, webhook signature verification, delivery idempotency, retries, quiet hours and audit/retention behavior. Implement and test those contracts before using credentials. Do not enter any credentials into this report.
-
-## Readiness
-
-Purchase-intent AI is **automated-code-path verified; external-service verification blocked**. OCR/image/voice is **not implemented and externally untestable**. WhatsApp is **not implemented and externally untestable**. No mocked result counts as live delivery evidence.
+Private PostgreSQL restore/extract/train/serve tests passed on synthetic data with real local owner authentication. Production-copy restore, RTO/RPO, backup retention/encryption, actual reverse proxy/TLS/cookie behavior, shared key-ring operation and multi-instance realtime need the deployment environment. Production ML additionally needs eligible real confirmed consumption history and accepted per-item baseline comparisons. None of these dependencies is replaced by a mock or synthetic forecast.

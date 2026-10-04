@@ -166,7 +166,7 @@ function StockRow({ item }: { item: StockItem }) {
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-4 py-3">
         <p className="text-sm font-medium text-gray-900">{item.name}</p>
-        <p className="text-xs text-gray-400">{item.itemCode}{item.barcode ? ` Â· ${item.barcode}` : ''}</p>
+        <p className="text-xs text-gray-400">{item.itemCode}{item.barcode ? ` · ${item.barcode}` : ''}</p>
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {item.systemStock} {item.defaultUnit}

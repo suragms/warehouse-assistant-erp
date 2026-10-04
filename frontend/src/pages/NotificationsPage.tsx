@@ -5,6 +5,7 @@ import { notificationApi, type NotificationDto } from '../api/notificationApi';
 import { notificationKeys } from '../lib/queryKeys';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/ui';
+import { notificationTarget } from '../lib/notificationTarget';
 
 export default function NotificationsPage() {
   const [page, setPage] = useState(1);
@@ -12,7 +13,7 @@ export default function NotificationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: notificationKeys.list({ page, onlyUnread }),
     queryFn: () => notificationApi.getNotifications(page, 15, onlyUnread),
   });
@@ -38,11 +39,7 @@ export default function NotificationsPage() {
     if (!n.isRead) {
       markReadMutation.mutate(n.id);
     }
-    if (n.referenceType === 'Purchase' && n.referenceId) {
-      navigate(`/purchases/${n.referenceId}`);
-    } else if (n.referenceType === 'CatalogItem' && n.referenceId) {
-      navigate(`/inventory/all`);
-    }
+    const target = notificationTarget(n); if (target) navigate(target);
   };
 
   return (
@@ -55,6 +52,7 @@ export default function NotificationsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => markAllReadMutation.mutate()}
+            disabled={markAllReadMutation.isPending || isLoading || isError}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-lg shadow-sm hover:bg-slate-50 transition-colors"
           >
             <CheckCheck className="w-4 h-4 text-indigo-600" />
@@ -94,10 +92,11 @@ export default function NotificationsPage() {
       </div>
 
       {/* List */}
+      {(markReadMutation.isError || markAllReadMutation.isError) && <p role="alert">Read status could not be saved. Try again.</p>}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-slate-500">Loading notifications...</div>
-        ) : notifications.length === 0 ? (
+        ) : isError ? <p role="alert" className="p-5">Notifications could not be loaded. <button className="underline" onClick={() => void refetch()}>Retry notifications</button></p> : notifications.length === 0 ? (
           <div className="p-16 text-center text-slate-500">
             <Bell className="w-12 h-12 mx-auto text-slate-300 mb-3" />
             <p className="font-medium">No notifications found</p>
@@ -106,10 +105,10 @@ export default function NotificationsPage() {
         ) : (
           <div className="divide-y divide-slate-200">
             {notifications.map((n: NotificationDto) => (
-              <div
+              <button type="button" disabled={markReadMutation.isPending}
                 key={n.id}
                 onClick={() => handleItemClick(n)}
-                className={`p-4 sm:p-5 hover:bg-slate-50 cursor-pointer transition-colors flex items-start gap-4 ${
+                className={`w-full text-left p-4 sm:p-5 hover:bg-slate-50 cursor-pointer transition-colors flex items-start gap-4 ${
                   !n.isRead ? 'bg-indigo-50/30' : ''
                 }`}
               >
@@ -132,13 +131,13 @@ export default function NotificationsPage() {
                     {new Date(n.createdAt).toLocaleString()}
                   </p>
                 </div>
-                {n.referenceId && (
+                {notificationTarget(n) && (
                   <div className="flex items-center gap-1 text-indigo-600 text-xs font-semibold self-center">
                     <span>View</span>
                     <ExternalLink className="w-4 h-4" />
                   </div>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         )}

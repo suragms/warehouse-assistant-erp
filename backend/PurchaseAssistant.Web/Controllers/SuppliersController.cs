@@ -19,9 +19,9 @@ namespace PurchaseAssistant.Web.Controllers
 
         [HttpGet]
         [Authorize(Policy = "RequireSupplierView")]
-        public async Task<ActionResult<List<SupplierDto>>> GetAll(CancellationToken cancellationToken = default)
+        public async Task<ActionResult<List<SupplierDto>>> GetAll(int page = 1, int pageSize = 1000, string? search = null, CancellationToken cancellationToken = default)
         {
-            return Ok(await _supplierService.GetAllAsync(cancellationToken));
+            return Ok(await _supplierService.SearchAsync(page, pageSize, search, cancellationToken));
         }
 
         [HttpGet("{id}")]

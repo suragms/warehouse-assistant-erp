@@ -1,3 +1,5 @@
+> Historical checkpoint. Phase 3 supersedes current implementation/status claims here; see [final readiness](FINAL_PRODUCTION_READINESS_2026-10-03.md) and [final matrix](FINAL_PENDING_FEATURE_MATRIX_2026-10-03.md). The old invoice/WhatsApp-removal finding is corrected in the current AI parity report.
+
 # Database Backup and Restore Rehearsal
 
 Date: 2026-10-03  

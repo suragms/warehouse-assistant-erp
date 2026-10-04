@@ -7,7 +7,7 @@ public record ModelArtifact(
     DateTime TrainedAt, DateOnly TrainingStart, DateOnly TrainingEnd, DateOnly ValidationStart, DateOnly ValidationEnd,
     DateOnly TestStart, DateOnly TestEnd, string FrameworkVersion, FittedModel Model,
     Dictionary<string, ErrorMetrics> ValidationMetrics, ErrorMetrics TestMetrics, ErrorMetrics BaselineTestMetrics,
-    double AbsoluteError90, List<DailyValue> TrainingHistory, bool QualityAccepted);
+    double AbsoluteError90, List<DailyValue> TrainingHistory, bool QualityAccepted, string CodeVersion = "legacy-unrecorded");
 
 public static class ForecastModel
 {

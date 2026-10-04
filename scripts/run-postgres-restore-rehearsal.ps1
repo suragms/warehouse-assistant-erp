@@ -43,7 +43,7 @@ $postgresLog = Join-Path $clusterRoot 'postgres.log'
 $applicationOut = Join-Path $clusterRoot 'application.stdout.log'
 $applicationErr = Join-Path $clusterRoot 'application.stderr.log'
 $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-$envNames = @('PGPASSWORD', 'PURCHASE_ASSISTANT_TEST_DATABASE', 'ConnectionStrings__DefaultConnection', 'Jwt__SecretKey', 'ASPNETCORE_ENVIRONMENT', 'ASPNETCORE_URLS', 'Logging__LogLevel__Default', 'Logging__LogLevel__Microsoft', 'Logging__LogLevel__Microsoft.EntityFrameworkCore')
+$envNames = @('PGPASSWORD', 'PURCHASE_ASSISTANT_TEST_DATABASE', 'ConnectionStrings__DefaultConnection', 'ML_DATABASE', 'ML__ArtifactPath', 'Jwt__SecretKey', 'ASPNETCORE_ENVIRONMENT', 'ASPNETCORE_URLS', 'Logging__LogLevel__Default', 'Logging__LogLevel__Microsoft', 'Logging__LogLevel__Microsoft.EntityFrameworkCore')
 $oldEnv = @{}
 foreach ($name in $envNames) { $oldEnv[$name] = [System.Environment]::GetEnvironmentVariable($name, 'Process') }
 $serverStarted = $false
@@ -84,7 +84,17 @@ try {
     $listener.Start()
     $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
     $listener.Stop()
-    Invoke-CheckedNative $toolsByName['pg_ctl'] @('--pgdata', $dataDirectory, '--options', "-h 127.0.0.1 -p $port -c listen_addresses=127.0.0.1", '--log', $postgresLog, '--wait', 'start') 'Private PostgreSQL startup'
+    # Redirect inherited handles to files so the database does not keep a calling pipe open.
+    $startupOutput = Join-Path $clusterRoot 'startup.log'
+    $startupError = Join-Path $clusterRoot 'startup-error.log'
+    $startup = Start-Process -FilePath $toolsByName['pg_ctl'] -ArgumentList @(
+        '--pgdata', "`"$dataDirectory`"",
+        '--options', "`"-h 127.0.0.1 -p $port -c listen_addresses=127.0.0.1`"",
+        '--log', "`"$postgresLog`"", '--wait', 'start'
+    ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $startupOutput -RedirectStandardError $startupError
+    $startup.WaitForExit()
+    if ($startup.ExitCode -ne 0) { throw "PostgreSQL startup failed with exit code $($startup.ExitCode)." }
+    Get-Content -LiteralPath $startupOutput
     $serverStarted = $true
 
     $bootstrapSql = "CREATE ROLE wa_test_runner LOGIN PASSWORD '$runnerPassword';`nCREATE DATABASE $sourceName OWNER wa_test_runner;`nCREATE DATABASE $targetName OWNER wa_test_runner;`n"
@@ -104,10 +114,13 @@ try {
         Set-TestDatabase $sourceName $port | Out-Null
         Invoke-CheckedNative 'dotnet' @('ef', 'database', 'update', '--project', 'backend/PurchaseAssistant.Infrastructure/PurchaseAssistant.Infrastructure.csproj', '--startup-project', 'backend/PurchaseAssistant.Web/PurchaseAssistant.Web.csproj', '--configuration', 'Release') 'Source schema migration'
 
+        [Reflection.Assembly]::LoadFrom((Join-Path $repositoryRoot 'backend/PurchaseAssistant.Web/bin/Release/net10.0/BCrypt-Net-Next.dll')) | Out-Null
+        $rehearsalPassword = 'Rehearsal-' + [Guid]::NewGuid().ToString('N')
+        $passwordHash = [BCrypt.Net.BCrypt]::HashPassword($rehearsalPassword)
         $seedSql = @"
 INSERT INTO "Businesses" ("Id","Name","Version","IsActive","CreatedAt") VALUES ('$sourceId','ASTRA Restore Rehearsal','$([Guid]::NewGuid().ToString())',true,NOW());
-INSERT INTO "Users" ("Id","Name","Email","PasswordHash","Status","CreatedAt") VALUES ('$userId','Rehearsal Owner','restore-$runId@example.invalid','not-a-login-hash',1,NOW());
-INSERT INTO "Memberships" ("Id","BusinessId","UserId","Role","PermissionsJson","CreatedAt") VALUES ('$membershipId','$sourceId','$userId',0,'[]',NOW());
+INSERT INTO "Users" ("Id","Name","Email","PasswordHash","Status","CreatedAt") VALUES ('$userId','Rehearsal Owner','restore-$runId@example.invalid','$passwordHash',0,NOW());
+INSERT INTO "Memberships" ("Id","BusinessId","UserId","Role","PermissionsJson","CreatedAt") VALUES ('$membershipId','$sourceId','$userId',1,'[]',NOW());
 INSERT INTO "Categories" ("Id","BusinessId","Name","CreatedAt") VALUES ('$categoryId','$sourceId','Restore rehearsal category',NOW());
 INSERT INTO "Suppliers" ("Id","BusinessId","Name","IsActive","CreatedAt") VALUES ('$supplierId','$sourceId','Restore rehearsal supplier',true,NOW());
 INSERT INTO "CatalogItems" ("Id","BusinessId","CategoryId","Name","ItemCode","DefaultUnit","ReorderLevel","CurrentStock","PhysicalStock","ReservedStock","IsActive","RowVersion","CreatedAt") VALUES ('$itemId','$sourceId','$categoryId','Restore rehearsal item','RESTORE-$runId','PCS',2,5,5,0,true,'$([Guid]::NewGuid().ToString())',NOW());
@@ -115,6 +128,8 @@ INSERT INTO "Purchases" ("Id","BusinessId","OrderNumber","SupplierId","Status","
 INSERT INTO "PurchaseItems" ("Id","BusinessId","PurchaseOrderId","CatalogItemId","Unit","FreightType","OrderedQuantity","ReceivedQuantity","UnitPrice","DiscountPercent","TaxPercent","LineTotal","CreatedAt") VALUES ('$purchaseItemId','$sourceId','$purchaseId','$itemId','PCS','separate',5,0,10,0,0,50,NOW());
 INSERT INTO "StockMovements" ("Id","BusinessId","CatalogItemId","MovementType","QuantityDelta","QuantityBefore","QuantityAfter","CreatedById","CreatedAt") VALUES ('$movementId','$sourceId','$itemId','RestoreRehearsalSeed',5,0,5,'$userId',NOW());
 INSERT INTO "SecurityAuditLogs" ("Id","BusinessId","UserId","EventType","Description","CreatedAt") VALUES ('$auditId','$sourceId','$userId','RestoreRehearsalSeed','Synthetic restore rehearsal row; no real credentials or business data.',NOW());
+INSERT INTO "DailyUsageLogs" ("Id","BusinessId","CatalogItemId","Date","OpeningQty","PurchasedQty","UsedQty","ClosingQty","LoggedByUserId","LoggedAt","CreatedAt","IsConfirmed")
+SELECT gen_random_uuid(),'$sourceId','$itemId',(NOW() AT TIME ZONE 'UTC')::date + i - 180,100,0,20 + .15*i + 2*EXTRACT(DOW FROM ((NOW() AT TIME ZONE 'UTC')::date + i - 180)),0,'$userId',(((NOW() AT TIME ZONE 'UTC')::date + i - 180) + time '23:00') AT TIME ZONE 'UTC',NOW(),true FROM generate_series(0,179) i;
 "@
         [System.IO.File]::WriteAllText($seedFile, $seedSql, [System.Text.Encoding]::UTF8)
         Invoke-CheckedNative $toolsByName['psql'] @('--host', '127.0.0.1', '--port', "$port", '--username', 'wa_test_runner', '--dbname', $sourceName, '--no-psqlrc', '--set', 'ON_ERROR_STOP=1', '--file', $seedFile) 'Synthetic cross-domain rehearsal fixture seed'
@@ -148,6 +163,13 @@ SELECT CASE WHEN
         $targetConsistency = & $toolsByName['psql'] '--host' '127.0.0.1' '--port' "$port" '--username' 'wa_test_runner' '--dbname' $targetName '--no-psqlrc' '--no-password' '--tuples-only' '--no-align' '--command' $consistencySql
         if ($LASTEXITCODE -ne 0 -or $targetConsistency.Trim() -ne 'consistent') { throw 'Restored domain fixture failed its consistency checks.' }
 
+        # End-to-end offline pipeline against the restored SYNTHETIC records only.
+        $env:ML_DATABASE = $env:ConnectionStrings__DefaultConnection
+        $env:ML__ArtifactPath = Join-Path $clusterRoot 'synthetic-models'
+        $trainingData = Join-Path $clusterRoot 'synthetic-usage.json'
+        Invoke-CheckedNative 'dotnet' @('run','--project','ml/PurchaseAssistant.ML.Tool','--configuration','Release','--','extract',$sourceId,$trainingData) 'Synthetic restored-data extraction'
+        Invoke-CheckedNative 'dotnet' @('run','--project','ml/PurchaseAssistant.ML.Tool','--configuration','Release','--','train',$trainingData,$env:ML__ArtifactPath) 'Synthetic restored-data training'
+
         $env:ASPNETCORE_ENVIRONMENT = 'Testing'
         $env:Jwt__SecretKey = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
         $listener.Start(); $apiPort = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port; $listener.Stop()
@@ -170,9 +192,32 @@ SELECT CASE WHEN
         $unauthenticated = Invoke-WebRequest -Uri "$baseUrl/api/v1/users" -TimeoutSec 5 -SkipHttpErrorCheck
         if ($unauthenticated.StatusCode -ne 401) { throw "Unauthenticated user-list request returned $($unauthenticated.StatusCode), expected 401." }
 
+        $login = Invoke-RestMethod -Uri "$baseUrl/api/v1/auth/login" -Method Post -ContentType 'application/json' -Body (@{ email = "restore-$runId@example.invalid"; password = $rehearsalPassword } | ConvertTo-Json)
+        $headers = @{ Authorization = 'Bearer ' + $login.data.accessToken }
+        if ($login.data.user.currentBusiness.role -ne 'Owner') { throw 'Restored owner login did not select the expected membership.' }
+        $stockBefore = Invoke-RestMethod -Uri "$baseUrl/api/v1/stock/$itemId" -Headers $headers
+        if ($stockBefore.systemStock -ne 5) { throw 'Authenticated restored stock read did not match the database.' }
+        $stockAfter = Invoke-RestMethod -Uri "$baseUrl/api/v1/stock/$itemId/adjust" -Headers $headers -Method Post -ContentType 'application/json' -Body (@{ quantityDelta = 1; reason = 'Synthetic HTTP restore check'; expectedVersion = $stockBefore.rowVersion } | ConvertTo-Json)
+        if ($stockAfter.systemStock -ne 6) { throw 'Authenticated stock mutation failed.' }
+        $forecast = Invoke-RestMethod -Uri "$baseUrl/api/v1/ml/items/${itemId}?horizon=14" -Headers $headers
+        if ($forecast.status -ne 'ready' -or $forecast.forecast.Count -ne 14) { throw 'Restored-data ML HTTP inference failed.' }
+        $export = Invoke-WebRequest -Uri "$baseUrl/api/v1/exports/ml/${itemId}.csv?horizon=14" -Headers $headers
+        if ($export.StatusCode -ne 200 -or $export.Headers.'Content-Type' -notmatch 'text/csv') { throw 'Authenticated forecast export failed.' }
+        $httpSql = @"
+SELECT CASE WHEN (SELECT "CurrentStock" FROM "CatalogItems" WHERE "Id"='$itemId')=6
+AND EXISTS (SELECT 1 FROM "StockMovements" WHERE "CatalogItemId"='$itemId' AND "QuantityDelta"=1)
+AND EXISTS (SELECT 1 FROM "SecurityAuditLogs" WHERE "BusinessId"='$sourceId' AND "EventType"='StockMovementAdded')
+AND (SELECT COUNT(*) FROM "MlPredictionLogs" WHERE "CatalogItemId"='$itemId')=1 THEN 'consistent' ELSE 'inconsistent' END;
+"@
+        $httpConsistency = & $toolsByName['psql'] '--host' '127.0.0.1' '--port' "$port" '--username' 'wa_test_runner' '--dbname' $targetName '--no-psqlrc' '--no-password' '--tuples-only' '--no-align' '--command' $httpSql
+        if ($LASTEXITCODE -ne 0 -or $httpConsistency.Trim() -ne 'consistent') { throw 'HTTP writes, audit, or prediction deduplication did not persist correctly.' }
+        $latencies = @(1..20 | ForEach-Object { $watch = [Diagnostics.Stopwatch]::StartNew(); Invoke-RestMethod -Uri "$baseUrl/api/v1/ml/items/${itemId}?horizon=14" -Headers $headers | Out-Null; $watch.Stop(); $watch.Elapsed.TotalMilliseconds })
+        $ordered = $latencies | Sort-Object
+        Write-Output ("Synthetic restored-model HTTP inference, 20 sequential warm requests: median {0:F1} ms, p95 {1:F1} ms. This is not representative production load." -f $ordered[9], $ordered[18])
+
         $env:PGPASSWORD = $runnerPassword
         Invoke-CheckedNative 'dotnet' @('test','backend/PurchaseAssistant.IntegrationTests/PurchaseAssistant.IntegrationTests.csproj','--configuration','Release','--logger','console;verbosity=minimal') 'PostgreSQL regression suite against the restored database'
-        Write-Output "Restore rehearsal passed: synthetic Business, membership, catalog, supplier, stock, purchase/financial, and audit rows restored consistently; $($beforeCounts.Count) table row counts matched; migrations and /health/ready passed; protected endpoint returned 401 without credentials. Private test database: $targetName"
+        Write-Output "Restore rehearsal passed: $($beforeCounts.Count) table row counts matched; migrations and readiness passed; real owner login, stock HTTP mutation, ledger/audit persistence, offline ML extraction/training, HTTP forecast/export and prediction deduplication passed against synthetic restored records; unauthenticated endpoint returned 401. Private test database: $targetName"
     }
     finally { Pop-Location }
 }

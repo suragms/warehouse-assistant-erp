@@ -46,6 +46,9 @@ namespace PurchaseAssistant.Infrastructure.Data
 
         private void ProtectStockLedger()
         {
+            if (ChangeTracker.Entries<HistoricalUsageBatch>().Any(e => e.State is EntityState.Modified or EntityState.Deleted)
+                || ChangeTracker.Entries<HistoricalUsageRow>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Historical import provenance is immutable.");
             if (ChangeTracker.Entries<SecurityAuditLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted)
                 || ChangeTracker.Entries<MlPredictionLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
                 throw new InvalidOperationException("Audit and prediction history are immutable.");
@@ -84,6 +87,7 @@ namespace PurchaseAssistant.Infrastructure.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
             ConfigureTenantRelationships(modelBuilder);
+            ConfigureHistoricalUsage(modelBuilder);
             modelBuilder.Entity<MlPredictionLog>(e => {
                 e.HasQueryFilter(x => x.BusinessId == CurrentBusinessId);
                 e.HasOne<CatalogItem>().WithMany().HasForeignKey(x => new { x.BusinessId, x.CatalogItemId }).HasPrincipalKey(x => new { x.BusinessId, x.Id }).OnDelete(DeleteBehavior.Restrict);

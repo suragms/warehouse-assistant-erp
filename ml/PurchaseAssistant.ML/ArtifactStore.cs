@@ -14,8 +14,60 @@ public class ArtifactStore(string? directory)
         var path = PathFor(artifact.BusinessId, artifact.ItemId); Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var payload = JsonSerializer.Serialize(artifact); var envelope = JsonSerializer.Serialize(new Envelope(Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(payload))), payload));
         var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { await File.WriteAllTextAsync(temp, envelope, ct); File.Move(temp, path, true); }
+        // Training writes candidates only. Promotion owns replacement and a retained rollback copy.
+        try { await File.WriteAllTextAsync(temp, envelope, ct); File.Move(temp, path, false); }
         finally { if (File.Exists(temp)) File.Delete(temp); }
+    }
+    public async Task<PromotionDecision> PromoteAsync(ModelArtifact candidate, string expectedVersion, CancellationToken ct = default)
+    {
+        Validate(candidate, candidate.BusinessId, candidate.ItemId);
+        var path = PathFor(candidate.BusinessId, candidate.ItemId); Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        // One operator mutation at a time; lock is released even when evaluation or IO fails.
+        await using var gate = new FileStream(path + ".promotion.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        var current = await LoadAsync(candidate.BusinessId, candidate.ItemId, ct);
+        if ((current?.Version ?? "none") != expectedVersion) throw new InvalidOperationException("Current version changed; review promotion again.");
+        var decision = ModelPromotion.Evaluate(candidate, current);
+        if (!decision.Allowed) return decision;
+        var staged = Path.Combine(Path.GetDirectoryName(path)!, "candidate-" + Guid.NewGuid().ToString("N"));
+        try {
+            var stagingStore = new ArtifactStore(staged); await stagingStore.SaveAsync(candidate, ct);
+            var prepared = stagingStore.PathFor(candidate.BusinessId, candidate.ItemId);
+            // Durable authorization precedes replacement. Installed version is the source of truth after an interrupted operator process.
+            var receipt = path + ".promotion-" + Guid.NewGuid().ToString("N") + ".json";
+            await File.WriteAllTextAsync(receipt, JsonSerializer.Serialize(new { AuthorizedAt = DateTime.UtcNow, candidate.BusinessId, candidate.ItemId, candidate.Version,
+                candidate.DatasetVersion, candidate.FeatureVersion, candidate.CodeVersion, candidate.TrainedAt, candidate.ValidationStart, candidate.ValidationEnd,
+                candidate.TestStart, candidate.TestEnd, candidate.ValidationMetrics, candidate.TestMetrics, candidate.BaselineTestMetrics, Decision = decision }), ct);
+            if (current != null) {
+                var archive = path + ".rollback-" + Guid.NewGuid().ToString("N") + ".json";
+                File.Replace(prepared, path, archive);
+            } else File.Move(prepared, path, false);
+        } finally {
+            // Directory is generated internally under the configured store, never supplied by an HTTP caller.
+            if (Directory.Exists(staged)) Directory.Delete(staged, true);
+        }
+        return decision;
+    }
+    public async Task RollbackAsync(Guid business, Guid item, string expectedVersion, string backupFile, CancellationToken ct = default)
+    {
+        var path = PathFor(business, item); var backup = Path.GetFullPath(backupFile);
+        if (Path.GetDirectoryName(backup) != Path.GetDirectoryName(path) || !Path.GetFileName(backup).StartsWith(Path.GetFileName(path) + ".rollback-", StringComparison.Ordinal))
+            throw new ArgumentException("Select a retained rollback file for this item in the same private directory.");
+        await using var gate = new FileStream(path + ".promotion.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        var current = await LoadAsync(business, item, ct);
+        if (current?.Version != expectedVersion) throw new InvalidOperationException("Current version changed; review rollback again.");
+        var temp = path + ".restore-" + Guid.NewGuid().ToString("N");
+        try {
+            if (new FileInfo(backup).Length > 1_000_000) throw new InvalidDataException();
+            File.Copy(backup, temp, false);
+            // Validate the copied envelope using the same size, checksum and scope checks as serving.
+            var envelope = JsonSerializer.Deserialize<Envelope>(await File.ReadAllTextAsync(temp, ct)) ?? throw new InvalidDataException();
+            if (new FileInfo(temp).Length > 1_000_000 || envelope.Payload == null || Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(envelope.Payload))) != envelope.Sha256) throw new InvalidDataException();
+            var restored = JsonSerializer.Deserialize<ModelArtifact>(envelope.Payload) ?? throw new InvalidDataException();
+            Validate(restored, business, item);
+            await File.WriteAllTextAsync(path + ".rollback-authorization-" + Guid.NewGuid().ToString("N") + ".json",
+                JsonSerializer.Serialize(new { AuthorizedAt = DateTime.UtcNow, BusinessId = business, ItemId = item, PreviousVersion = current.Version, RestoredVersion = restored.Version }), ct);
+            File.Replace(temp, path, path + ".rollback-" + Guid.NewGuid().ToString("N") + ".json");
+        } finally { if (File.Exists(temp)) File.Delete(temp); }
     }
     public async Task<ModelArtifact?> LoadAsync(Guid business, Guid item, CancellationToken ct = default)
     {

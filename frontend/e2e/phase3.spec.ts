@@ -20,7 +20,7 @@ async function mocks(page: Page) {
     else if (path === '/purchases/p1') data = { id: 'p1', orderNumber: 'PO-TEST', supplierId: 's1', supplierName: 'Supplier A', status: 2, paymentState: 0, deliveryState: 0, version: 1,
       subtotal: 40, taxTotal: 0, grandTotal: 40, createdAt: '2026-10-01T00:00:00Z', items: [{ id: 'pi1', catalogItemId: 'c1', itemCode: 'R1', catalogItemName: 'Rice', orderedQuantity: 10, receivedQuantity: 0, unitPrice: 4, lineTotal: 40 }] };
     else if (path === '/notifications/unread-count') data = { count: 0 };
-    else if (path === '/dashboard') data = { operationalAlerts: [], recentPurchases: [], recentStockActivity: [] };
+    else if (path === '/dashboard') data = { purchaseMetrics: { todayPurchasesCount: 0, pendingPurchasesCount: 0, activePurchasesCount: 0, completedPurchasesCount: 0, totalPurchaseSpend: 0 }, stockMetrics: { totalCatalogItems: 0, lowStockCount: 0, outOfStockCount: 0, itermsWithPhysicalVariance: 0 }, operationalAlerts: [], recentPurchases: [], recentStockActivity: [] };
     else if (path === '/reports/purchases-summary') data = { bySupplier: [], byCategory: [], byStatus: [] };
     else if (path === '/reports/stock-analytics') data = { totalCatalogItems: 0, lowStockCount: 0, outOfStockCount: 0, estimatedInventoryValue: 0, totalMovementsCount: 0 };
     else if (path === '/reports/comparison') data = { currentPeriodSpend: 0, previousPeriodSpend: 0, spendChangePercentage: 0, currentPeriodOrders: 0, previousPeriodOrders: 0, ordersChangePercentage: 0, currentPeriodAvgOrderValue: 0, previousPeriodAvgOrderValue: 0, avgOrderValueChangePercentage: 0 };

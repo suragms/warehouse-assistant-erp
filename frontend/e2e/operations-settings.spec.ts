@@ -25,6 +25,7 @@ async function fixture(page: Page, role: Role, empty = false) {
     else if (path === '/settings/business') { if (method === 'PUT') profile = { ...profile, ...body, version: 'v2' }; data = profile; }
     else if (path === '/settings/profile') { if (method === 'PUT') personal = { ...personal, name: body.name }; data = personal; }
     else if (path === '/settings/notifications') { if (method === 'PUT') preferences = body; data = preferences; }
+    else if (path === '/settings/ai') data = { enabled: true, providerOrder: ['OpenAI'], models: {}, timeoutSeconds: 8, retries: 0, version: 'v1' };
     else if (path === '/settings/credentials') data = savedCredential ? [{ credentialType: 'openai_key', configured: true, lastFour: '1234', version: 'v2', updatedAt: '2026-10-02' }] : [];
     else if (path.startsWith('/settings/credentials/')) { expect(body.value).toBe('browser-only-test-key-1234'); savedCredential = true; data = { credentialType: 'openai_key', configured: true, lastFour: '1234', version: 'v2' }; }
     else if (path === '/operations/checklist/today') data = { date: '2026-10-02', morning: empty ? [] : [{ ...templates[0], isCompleted: completed, notes: checklistNotes }], midday: [], evening: [], completionPercentage: completed ? 100 : 0 };
@@ -111,7 +112,14 @@ for (const role of ['Owner', 'Manager', 'Staff'] as const) for (const [width, he
     else { await page.getByRole('button', { name: 'Edit checklist templates' }).click(); await page.getByLabel('Task 1 description').fill('Opening verification'); await page.getByRole('button', { name: 'Save templates' }).click(); await expect(page.getByRole('status')).toContainText('Checklist templates saved.');
       await page.getByLabel('Rice quantity used').fill('2'); await page.getByLabel('Rice usage notes').fill('Used for work'); await page.getByRole('button', { name: 'Save daily usage' }).click(); await expect(page.getByRole('status')).toContainText('Daily usage saved.'); }
     await page.getByLabel('From date').fill('2026-10-01'); await page.getByLabel('Snapshot item').selectOption('c1'); await noOverflow(page);
-    await page.getByRole('heading', { name: 'Stock movement summary', exact: true }).scrollIntoViewIfNeeded(); await expect(page.getByText('Business supplier: 2 purchases')).toBeVisible(); await noOverflow(page);
+    if (role === 'Staff') {
+      await expect(page.getByRole('heading', { name: 'Stock movement summary', exact: true })).toHaveCount(0);
+      expect(calls.filter(c => c === 'GET /operations/reports/summary')).toHaveLength(0);
+    } else {
+      await page.getByRole('heading', { name: 'Stock movement summary', exact: true }).scrollIntoViewIfNeeded();
+      await expect(page.getByText('Business supplier: 2 purchases')).toBeVisible();
+    }
+    await noOverflow(page);
     await page.screenshot({ path: info.outputPath('operations-summary.png') }); await page.locator('main').evaluate(el => el.scrollTo(0, 0));
     await page.screenshot({ path: info.outputPath('operations.png'), fullPage: true });
     await page.goto('/settings'); await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();

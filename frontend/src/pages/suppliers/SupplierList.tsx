@@ -13,6 +13,7 @@ import { hasPermission } from '../../auth/hasPermission';
 export default function SupplierList() {
   const user = useAuthStore(s => s.user);
   const [history, setHistory] = useState<Supplier | null>(null);
+  const [search, setSearch] = useState(''); const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -32,8 +33,8 @@ export default function SupplierList() {
   const [supplierForItems, setSupplierForItems] = useState<Supplier | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: supplierKeys.lists(),
-    queryFn: () => catalogApi.getSuppliers(),
+    queryKey: [...supplierKeys.lists(), search, page],
+    queryFn: () => catalogApi.getSuppliers({ search, page, pageSize: 50 }),
   });
 
   const saveMutation = useMutation({
@@ -113,6 +114,12 @@ export default function SupplierList() {
         }
       />
 
+      <div className="my-4 flex flex-wrap items-end gap-3">
+        <Input label="Search suppliers" value={search} maxLength={200} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+        <Button variant="secondary" disabled={page === 1 || isLoading} onClick={() => setPage(p => p - 1)}>Previous</Button>
+        <span className="py-2 text-sm">Page {page}</span>
+        <Button variant="secondary" disabled={isLoading || !data || data.length < 50} onClick={() => setPage(p => p + 1)}>Next</Button>
+      </div>
       <Card className="overflow-x-auto">
         {isLoading ? (
           <div className="p-4 space-y-4">

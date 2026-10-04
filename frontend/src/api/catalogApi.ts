@@ -138,7 +138,7 @@ export const catalogApi = {
   },
 
   lookupByBarcode: async (barcode: string): Promise<CatalogItem> => {
-    const res = await apiClient.get(`/catalog/items/by-barcode/${barcode}`);
+    const res = await apiClient.get(`/catalog/items/by-barcode/${encodeURIComponent(barcode)}`);
     return res.data;
   },
 
@@ -216,8 +216,8 @@ export const catalogApi = {
   },
 
   // Suppliers
-  getSuppliers: async (): Promise<Supplier[]> => {
-    const res = await apiClient.get('/catalog/suppliers');
+  getSuppliers: async (params?: { search?: string; page?: number; pageSize?: number }): Promise<Supplier[]> => {
+    const res = await apiClient.get('/catalog/suppliers', { params });
     return res.data;
   },
 
@@ -252,8 +252,8 @@ export const catalogApi = {
   },
 
   // Brokers
-  getBrokers: async (): Promise<Broker[]> => {
-    const res = await apiClient.get('/catalog/brokers');
+  getBrokers: async (params?: { search?: string; page?: number; pageSize?: number }): Promise<Broker[]> => {
+    const res = await apiClient.get('/catalog/brokers', { params });
     return res.data;
   },
 

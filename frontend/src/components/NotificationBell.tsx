@@ -4,6 +4,7 @@ import { Bell, CheckCheck, ExternalLink } from 'lucide-react';
 import { notificationApi, type NotificationDto } from '../api/notificationApi';
 import { notificationKeys } from '../lib/queryKeys';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { notificationTarget } from '../lib/notificationTarget';
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -56,11 +57,7 @@ export function NotificationBell() {
       markReadMutation.mutate(n.id);
     }
     setOpenLocationKey(null);
-    if (n.referenceType === 'Purchase' && n.referenceId) {
-      navigate(`/purchases/${n.referenceId}`);
-    } else if (n.referenceType === 'CatalogItem' && n.referenceId) {
-      navigate(`/inventory/all`);
-    }
+    const target = notificationTarget(n); if (target) navigate(target);
   };
 
   return (
@@ -134,7 +131,7 @@ export function NotificationBell() {
                       {new Date(n.createdAt).toLocaleString()}
                     </p>
                   </div>
-                  {n.referenceId && (
+                  {notificationTarget(n) && (
                     <ExternalLink className="w-4 h-4 text-slate-400 shrink-0 self-center" />
                   )}
                 </button>

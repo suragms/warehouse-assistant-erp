@@ -67,8 +67,12 @@ for (const role of ['Owner', 'Manager', 'Staff'] as const) for (const [width, he
   test(`keyboard forms ${role} ${width}x${height}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 360 }); const calls = await navigationFixture(page, role);
     await page.goto('/purchases/new'); await page.getByLabel('Enter purchase request').fill('Review rice'); await reachable(page.getByRole('button', { name: 'Preview Purchase', exact: true })); await geometry(page);
-    await page.goto('/suppliers'); await page.getByRole('button', { name: 'New Supplier', exact: true }).click(); const supplier = page.getByRole('dialog', { name: 'New Supplier', exact: true });
-    await supplier.getByLabel('Supplier Name').fill('Keyboard fixture'); await supplier.getByLabel('Notes').fill('Synthetic form only'); await reachable(supplier.getByRole('button', { name: 'Save', exact: true })); await supplier.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.goto('/suppliers');
+    if (role === 'Staff') await expect(page.getByRole('button', { name: 'New Supplier', exact: true })).toHaveCount(0);
+    else {
+      await page.getByRole('button', { name: 'New Supplier', exact: true }).click(); const supplier = page.getByRole('dialog', { name: 'New Supplier', exact: true });
+      await supplier.getByLabel('Supplier Name').fill('Keyboard fixture'); await supplier.getByLabel('Notes').fill('Synthetic form only'); await reachable(supplier.getByRole('button', { name: 'Save', exact: true })); await supplier.getByRole('button', { name: 'Cancel', exact: true }).click();
+    }
     if (role !== 'Staff') { await page.goto('/users'); await page.getByRole('button', { name: 'Add User', exact: true }).click(); await page.getByLabel('Full Name').fill('Keyboard colleague'); await reachable(page.getByRole('button', { name: 'Create User', exact: true })); }
     else { await page.goto('/users'); await expect(page.getByRole('heading', { name: 'Access unavailable', exact: true })).toBeVisible(); }
     await page.goto('/settings'); await page.getByLabel('Your name').fill('Keyboard colleague'); await reachable(page.getByRole('button', { name: 'Save personal profile', exact: true })); await geometry(page);

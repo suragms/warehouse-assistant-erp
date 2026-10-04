@@ -35,6 +35,6 @@ for (const role of ['Owner', 'Manager', 'Staff'] as const) test(`bilingual help 
   await expect(page.locator('[lang="ar"][dir="rtl"]').getByText('افتح الصنف لمراجعة مخزون النظام والعدد الفعلي.')).toBeVisible();
   await page.getByRole('link', { name: 'Try it · Stock', exact: true }).click(); await expect(page).toHaveURL(/inventory\/all$/);
   await page.goto('/settings/help'); await page.locator('summary').filter({ hasText: /^Barcode lookup$/ }).click();
-  await expect(page.getByText('المسح بالكاميرا والتعرف على الصور غير متاحين في تطبيق الويب هذا.')).toBeVisible();
+  await expect(page.getByText('استخدم الكاميرا في المتصفحات المدعومة أو أدخل الرمز يدوياً.')).toBeVisible();
   if (role !== 'Owner') await expect(page.locator('summary').filter({ hasText: /^Add staff$/ })).toHaveCount(0);
 });

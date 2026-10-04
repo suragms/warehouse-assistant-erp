@@ -47,6 +47,7 @@ public partial class PurchaseIntentEndpointTests
     {
         using var factory = new Factory { Permission = "catalog.view", RealDashboard = true }; using var client = factory.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", Token("stock.view", true));
         using (var scope = factory.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); db.Add(new CatalogItem { BusinessId = BusinessId, Name = "Secret item" }); db.Add(new Notification { BusinessId = BusinessId, UserId = UserId, Type = NotificationType.LowStock, Title = "Secret item" }); db.Add(new PurchaseOrder { BusinessId = BusinessId, OrderNumber = "Secret order" }); await db.SaveChangesAsync(); }
+        using (var scope = factory.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); foreach (var type in new[] { "CatalogItem", "PurchaseOrder", "MlPrediction", "Membership", "DamageReport" }) db.Add(new Notification { BusinessId = BusinessId, UserId = UserId, Type = NotificationType.System, ReferenceType = type, Title = "Secret " + type }); await db.SaveChangesAsync(); }
         var dashboard = await client.GetStringAsync("/api/v1/dashboard"); Assert.DoesNotContain("Secret", dashboard);
         var notifications = await client.GetStringAsync("/api/v1/notifications"); Assert.DoesNotContain("Secret", notifications);
         Assert.Equal(0, JsonDocument.Parse(await client.GetStringAsync("/api/v1/notifications/unread-count")).RootElement.GetProperty("count").GetInt32());
@@ -76,6 +77,15 @@ public class WhatsAppContractTests
         var count = handler.Calls; Assert.Equal(row.Id, (await service.Send(order.Id, request, default)).Id); Assert.Equal(count, handler.Calls);
         if (expected == "unknown") await Assert.ThrowsAsync<InvalidOperationException>(() => service.Send(order.Id, request with { RequestId = Guid.NewGuid(), DeliveryVersion = row.Version }, default));
         Assert.Equal(2, await db.SecurityAuditLogs.CountAsync()); Assert.DoesNotContain("test-only-key", JsonSerializer.Serialize(await db.SecurityAuditLogs.ToListAsync()));
+        if (mode == "ok") {
+            row.Status = "sending"; row.UpdatedAt = DateTime.UtcNow; await db.SaveChangesAsync();
+            var retry = request with { RequestId = Guid.NewGuid(), DeliveryVersion = row.Version, VerifiedNotDelivered = true };
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.Send(order.Id, retry, default));
+            row.UpdatedAt = DateTime.UtcNow.AddMinutes(-3); await db.SaveChangesAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.Send(order.Id, retry with { VerifiedNotDelivered = false }, default));
+            Assert.Equal(count, handler.Calls);
+            Assert.Equal("accepted", (await service.Send(order.Id, retry, default)).Status); Assert.Equal(count + 2, handler.Calls);
+        }
     }
     private sealed class DeliveryHandler(string mode) : HttpMessageHandler
     {
