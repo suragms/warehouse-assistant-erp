@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$KeepCluster)
+param([switch]$KeepCluster, [switch]$RunLoad)
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -34,6 +34,10 @@ $itemId = [Guid]::NewGuid().ToString()
 $purchaseId = [Guid]::NewGuid().ToString()
 $purchaseItemId = [Guid]::NewGuid().ToString()
 $movementId = [Guid]::NewGuid().ToString()
+$historyBatchId = [Guid]::NewGuid().ToString()
+$historyRowId = [Guid]::NewGuid().ToString()
+$loadItems = @(1..4 | ForEach-Object { [Guid]::NewGuid().ToString() })
+$recoveryMetrics = [ordered]@{ NonproductionSynthetic = $true; RunId = $runId }
 $auditId = [Guid]::NewGuid().ToString()
 $adminPwFile = Join-Path $clusterRoot 'initdb-password.txt'
 $bootstrapFile = Join-Path $clusterRoot 'bootstrap.sql'
@@ -43,7 +47,7 @@ $postgresLog = Join-Path $clusterRoot 'postgres.log'
 $applicationOut = Join-Path $clusterRoot 'application.stdout.log'
 $applicationErr = Join-Path $clusterRoot 'application.stderr.log'
 $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-$envNames = @('PGPASSWORD', 'PURCHASE_ASSISTANT_TEST_DATABASE', 'ConnectionStrings__DefaultConnection', 'ML_DATABASE', 'ML__ArtifactPath', 'Jwt__SecretKey', 'ASPNETCORE_ENVIRONMENT', 'ASPNETCORE_URLS', 'Logging__LogLevel__Default', 'Logging__LogLevel__Microsoft', 'Logging__LogLevel__Microsoft.EntityFrameworkCore')
+$envNames = @('PGPASSWORD', 'PURCHASE_ASSISTANT_TEST_DATABASE', 'ConnectionStrings__DefaultConnection', 'ML_DATABASE', 'ML__ArtifactPath', 'Jwt__SecretKey', 'ASPNETCORE_ENVIRONMENT', 'ASPNETCORE_URLS', 'Logging__LogLevel__Default', 'Logging__LogLevel__Microsoft', 'Logging__LogLevel__Microsoft.EntityFrameworkCore', 'WA_LOAD_URL', 'WA_LOAD_DATABASE', 'WA_LOAD_ITEMS', 'WA_LOAD_TOKEN', 'WA_LOAD_PID', 'WA_LOAD_EMAIL', 'WA_LOAD_PASSWORD', 'WA_LOAD_SUPPLIER', 'WA_LOAD_ML_ITEM')
 $oldEnv = @{}
 foreach ($name in $envNames) { $oldEnv[$name] = [System.Environment]::GetEnvironmentVariable($name, 'Process') }
 $serverStarted = $false
@@ -131,6 +135,27 @@ INSERT INTO "SecurityAuditLogs" ("Id","BusinessId","UserId","EventType","Descrip
 INSERT INTO "DailyUsageLogs" ("Id","BusinessId","CatalogItemId","Date","OpeningQty","PurchasedQty","UsedQty","ClosingQty","LoggedByUserId","LoggedAt","CreatedAt","IsConfirmed")
 SELECT gen_random_uuid(),'$sourceId','$itemId',(NOW() AT TIME ZONE 'UTC')::date + i - 180,100,0,20 + .15*i + 2*EXTRACT(DOW FROM ((NOW() AT TIME ZONE 'UTC')::date + i - 180)),0,'$userId',(((NOW() AT TIME ZONE 'UTC')::date + i - 180) + time '23:00') AT TIME ZONE 'UTC',NOW(),true FROM generate_series(0,179) i;
 "@
+        $seedSql += @"
+INSERT INTO "HistoricalUsageBatches" ("Id","BusinessId","ImportedById","ImportedAt","Source","FileHash","RawCsv","RowCount","CreatedAt") VALUES ('$historyBatchId','$sourceId','$userId',NOW(),'Synthetic recovery fixture',repeat('a',64),'SYNTHETIC RESTORE FIXTURE ONLY',1,NOW());
+INSERT INTO "HistoricalUsageRows" ("Id","BusinessId","BatchId","CatalogItemId","Date","Quantity","Unit","SourceRecordedAt","CreatedAt") VALUES ('$historyRowId','$sourceId','$historyBatchId','$itemId',((NOW() AT TIME ZONE 'UTC')::date-200),4,'PCS',(((NOW() AT TIME ZONE 'UTC')::date-200)+time '23:00') AT TIME ZONE 'UTC',NOW());
+"@
+        if ($RunLoad) {
+            $seedSql += @"
+INSERT INTO "CatalogItems" ("Id","BusinessId","CategoryId","Name","ItemCode","DefaultUnit","ReorderLevel","CurrentStock","PhysicalStock","ReservedStock","IsActive","RowVersion","CreatedAt")
+SELECT gen_random_uuid(),'$sourceId','$categoryId','Load item ' || i,'LOAD-' || i,'PCS',2,100,100,0,true,gen_random_uuid(),NOW() FROM generate_series(1,2000) i;
+INSERT INTO "Purchases" ("Id","BusinessId","OrderNumber","SupplierId","Status","PaymentState","DeliveryState","Notes","Subtotal","TaxTotal","GrandTotal","CreatedAt","HeaderDiscountPercent","FreightType","FreightAmount","DeliveredCharge","BilltyCharge","CommissionMode","CommissionPercent","CommissionAmount","PaidAmount")
+SELECT gen_random_uuid(),'$sourceId','LOAD-SEED-' || i,'$supplierId',1,0,0,'Synthetic load fixture',50,0,50,NOW()-i*interval '1 hour',0,'separate',0,0,0,'percent',0,0,0 FROM generate_series(1,3000) i;
+INSERT INTO "PurchaseItems" ("Id","BusinessId","PurchaseOrderId","CatalogItemId","Unit","FreightType","OrderedQuantity","ReceivedQuantity","UnitPrice","DiscountPercent","TaxPercent","LineTotal","CreatedAt")
+SELECT gen_random_uuid(),'$sourceId',p."Id",'$itemId','PCS','separate',5,0,10,0,0,50,p."CreatedAt" FROM "Purchases" p WHERE p."OrderNumber" LIKE 'LOAD-SEED-%';
+INSERT INTO "StockMovements" ("Id","BusinessId","CatalogItemId","MovementType","QuantityDelta","QuantityBefore","QuantityAfter","CreatedById","CreatedAt")
+SELECT gen_random_uuid(),'$sourceId','$itemId','SyntheticLoad',1,100,101,'$userId',NOW()-i*interval '1 hour' FROM generate_series(1,10000) i;
+"@
+            foreach ($loadItem in $loadItems) {
+                $seedSql += @"
+INSERT INTO "CatalogItems" ("Id","BusinessId","CategoryId","Name","ItemCode","DefaultUnit","ReorderLevel","CurrentStock","PhysicalStock","ReservedStock","IsActive","RowVersion","CreatedAt") VALUES ('$loadItem','$sourceId','$categoryId','Load worker item','LOAD-$loadItem','PCS',2,100,100,0,true,gen_random_uuid(),NOW());
+"@
+            }
+        }
         [System.IO.File]::WriteAllText($seedFile, $seedSql, [System.Text.Encoding]::UTF8)
         Invoke-CheckedNative $toolsByName['psql'] @('--host', '127.0.0.1', '--port', "$port", '--username', 'wa_test_runner', '--dbname', $sourceName, '--no-psqlrc', '--set', 'ON_ERROR_STOP=1', '--file', $seedFile) 'Synthetic cross-domain rehearsal fixture seed'
         Remove-Item -LiteralPath $seedFile -Force
@@ -140,7 +165,7 @@ SELECT gen_random_uuid(),'$sourceId','$itemId',(NOW() AT TIME ZONE 'UTC')::date 
 SELECT CASE WHEN
  (SELECT COUNT(*) FROM "Businesses" WHERE "Id"='$sourceId')=1
  AND (SELECT "CurrentStock" FROM "CatalogItems" WHERE "Id"='$itemId')=5
- AND (SELECT COUNT(*) FROM "StockMovements" WHERE "CatalogItemId"='$itemId' AND "QuantityBefore"+"QuantityDelta"="QuantityAfter")=1
+ AND (SELECT COUNT(*) FROM "StockMovements" WHERE "CatalogItemId"='$itemId' AND "QuantityBefore"+"QuantityDelta"="QuantityAfter" AND "MovementType"='RestoreRehearsalSeed')=1
  AND (SELECT COUNT(*) FROM "Purchases" p JOIN "PurchaseItems" i ON i."PurchaseOrderId"=p."Id" WHERE p."Id"='$purchaseId' AND p."BusinessId"=i."BusinessId" AND p."GrandTotal"=i."LineTotal")=1
  AND (SELECT COUNT(*) FROM "SecurityAuditLogs" WHERE "Id"='$auditId' AND "BusinessId"='$sourceId')=1
  THEN 'consistent' ELSE 'inconsistent' END;
@@ -148,11 +173,26 @@ SELECT CASE WHEN
         $sourceConsistency = & $toolsByName['psql'] '--host' '127.0.0.1' '--port' "$port" '--username' 'wa_test_runner' '--dbname' $sourceName '--no-psqlrc' '--no-password' '--tuples-only' '--no-align' '--command' $consistencySql
         if ($LASTEXITCODE -ne 0 -or $sourceConsistency.Trim() -ne 'consistent') { throw 'Synthetic source backup fixture failed its consistency checks.' }
 
+        # Model files are backed up separately from PostgreSQL, then restored byte-for-byte.
+        $env:ML_DATABASE = $env:ConnectionStrings__DefaultConnection
+        $sourceModels = Join-Path $clusterRoot 'source-synthetic-models'
+        $assetBackup = Join-Path $clusterRoot 'model-backup'
+        $sourceDataset = Join-Path $clusterRoot 'source-synthetic-usage.json'
+        Invoke-CheckedNative 'dotnet' @('run','--project','ml/PurchaseAssistant.ML.Tool','--configuration','Release','--','extract',$sourceId,$sourceDataset) 'Synthetic source dataset extraction'
+        Invoke-CheckedNative 'dotnet' @('run','--project','ml/PurchaseAssistant.ML.Tool','--configuration','Release','--','train',$sourceDataset,$sourceModels) 'Synthetic source candidate training'
+        foreach ($assetPath in @($sourceModels,$assetBackup)) { if (-not [IO.Path]::GetFullPath($assetPath).StartsWith($clusterRoot + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Model asset path escaped private cluster.' } }
+        Copy-Item -LiteralPath $sourceModels -Destination $assetBackup -Recurse
+        $backupTimer = [Diagnostics.Stopwatch]::StartNew()
         Invoke-CheckedNative $toolsByName['pg_dump'] @('--host', '127.0.0.1', '--port', "$port", '--username', 'wa_test_runner', '--dbname', $sourceName, '--no-password', '--format=custom', "--file=$backupFile") 'Custom-format private PostgreSQL backup'
+        $backupTimer.Stop(); $recoveryMetrics.BackupSeconds = $backupTimer.Elapsed.TotalSeconds
+        $recoveryTimer = [Diagnostics.Stopwatch]::StartNew()
+        $restoreTimer = [Diagnostics.Stopwatch]::StartNew()
         Invoke-CheckedNative $toolsByName['pg_restore'] @('--host', '127.0.0.1', '--port', "$port", '--username', 'wa_test_runner', '--dbname', $targetName, '--no-password', '--exit-on-error', '--no-owner', '--role=wa_test_runner', $backupFile) 'Restore into the separate clean disposable database'
 
+        $restoreTimer.Stop(); $recoveryMetrics.RestoreSeconds = $restoreTimer.Elapsed.TotalSeconds
         Set-TestDatabase $targetName $port | Out-Null
         Invoke-CheckedNative 'dotnet' @('ef', 'database', 'update', '--project', 'backend/PurchaseAssistant.Infrastructure/PurchaseAssistant.Infrastructure.csproj', '--startup-project', 'backend/PurchaseAssistant.Web/PurchaseAssistant.Web.csproj', '--configuration', 'Release') 'Post-restore migration check'
+        $validationTimer = [Diagnostics.Stopwatch]::StartNew()
         $afterCounts = Get-TableCounts $targetName $port
         foreach ($table in $beforeCounts.Keys) {
             if (-not $afterCounts.Contains($table) -or $beforeCounts[$table] -ne $afterCounts[$table]) {
@@ -163,12 +203,20 @@ SELECT CASE WHEN
         $targetConsistency = & $toolsByName['psql'] '--host' '127.0.0.1' '--port' "$port" '--username' 'wa_test_runner' '--dbname' $targetName '--no-psqlrc' '--no-password' '--tuples-only' '--no-align' '--command' $consistencySql
         if ($LASTEXITCODE -ne 0 -or $targetConsistency.Trim() -ne 'consistent') { throw 'Restored domain fixture failed its consistency checks.' }
 
+        $validationTimer.Stop(); $recoveryMetrics.IntegrityValidationSeconds = $validationTimer.Elapsed.TotalSeconds
+        $recoveryMetrics.MatchedTables = $afterCounts.Count
         # End-to-end offline pipeline against the restored SYNTHETIC records only.
         $env:ML_DATABASE = $env:ConnectionStrings__DefaultConnection
         $env:ML__ArtifactPath = Join-Path $clusterRoot 'synthetic-models'
         $trainingData = Join-Path $clusterRoot 'synthetic-usage.json'
         Invoke-CheckedNative 'dotnet' @('run','--project','ml/PurchaseAssistant.ML.Tool','--configuration','Release','--','extract',$sourceId,$trainingData) 'Synthetic restored-data extraction'
-        Invoke-CheckedNative 'dotnet' @('run','--project','ml/PurchaseAssistant.ML.Tool','--configuration','Release','--','train',$trainingData,$env:ML__ArtifactPath) 'Synthetic restored-data training'
+        $restoredModels = [IO.Path]::GetFullPath($env:ML__ArtifactPath)
+        if (-not $restoredModels.StartsWith($clusterRoot + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe model restore target.' }
+        Copy-Item -LiteralPath $assetBackup -Destination $restoredModels -Recurse
+        $originalArtifact = Join-Path $sourceModels ($sourceId.Replace('-','') + '/' + $itemId.Replace('-','') + '.json')
+        $restoredArtifact = Join-Path $restoredModels ($sourceId.Replace('-','') + '/' + $itemId.Replace('-','') + '.json')
+        if ((Get-FileHash -LiteralPath $originalArtifact).Hash -ne (Get-FileHash -LiteralPath $restoredArtifact).Hash) { throw 'Restored model checksum differs from backup.' }
+        $recoveryMetrics.ModelAssetChecksumMatched = $true
 
         $env:ASPNETCORE_ENVIRONMENT = 'Testing'
         $env:Jwt__SecretKey = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
@@ -177,6 +225,7 @@ SELECT CASE WHEN
         $env:ASPNETCORE_URLS = $baseUrl
         $applicationDll = Join-Path $repositoryRoot 'backend/PurchaseAssistant.Web/bin/Release/net10.0/PurchaseAssistant.Web.dll'
         if (-not (Test-Path -LiteralPath $applicationDll)) { throw 'The Release web application build output is missing.' }
+        $applicationTimer = [Diagnostics.Stopwatch]::StartNew()
         $applicationProcess = Start-Process -FilePath 'dotnet' -ArgumentList @($applicationDll,'--urls',$baseUrl) -WorkingDirectory (Join-Path $repositoryRoot 'backend/PurchaseAssistant.Web') -PassThru -WindowStyle Hidden -RedirectStandardOutput $applicationOut -RedirectStandardError $applicationErr
         $ready = $false
         for ($attempt = 0; $attempt -lt 45; $attempt++) {
@@ -203,6 +252,32 @@ SELECT CASE WHEN
         if ($forecast.status -ne 'ready' -or $forecast.forecast.Count -ne 14) { throw 'Restored-data ML HTTP inference failed.' }
         $export = Invoke-WebRequest -Uri "$baseUrl/api/v1/exports/ml/${itemId}.csv?horizon=14" -Headers $headers
         if ($export.StatusCode -ne 200 -or $export.Headers.'Content-Type' -notmatch 'text/csv') { throw 'Authenticated forecast export failed.' }
+        $purchaseRead = Invoke-RestMethod -Uri "$baseUrl/api/v1/purchases/$purchaseId" -Headers $headers
+        if ($purchaseRead.grandTotal -ne 50 -or $purchaseRead.items.Count -ne 1) { throw 'Restored purchase and line did not match.' }
+        $reportRead = Invoke-WebRequest -Uri "$baseUrl/api/v1/reports/purchases-summary" -Headers $headers -SkipHttpErrorCheck
+        if ($reportRead.StatusCode -ne 200) { throw 'Restored reports failed.' }
+        $aiRead = Invoke-RestMethod -Uri "$baseUrl/api/v1/ai/purchase-intent/parse" -Headers $headers -Method Post -ContentType 'application/json' -Body '{"prompt":"Synthetic rehearsal only: buy 1 PCS"}'
+        if ($aiRead.status -ne 'Error') { throw 'Unconfigured AI must report an explicit error, never fabricated success.' }
+        $auditRead = Invoke-WebRequest -Uri "$baseUrl/api/v1/audit" -Headers $headers -SkipHttpErrorCheck
+        if ($auditRead.StatusCode -ne 200 -or $auditRead.Content -notmatch 'StockMovementAdded') { throw 'Restored audit read failed.' }
+        # Exercise the real historical import API against PostgreSQL, with no inventory mutation.
+        $historicalDate = [DateTime]::UtcNow.Date.AddDays(-201).ToString('yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture)
+        $historicalCsv = "business_id,warehouse_id,item_id,date,quantity,unit,transaction_type,recorded_at`n$sourceId,$sourceId,$itemId,$historicalDate,3,PCS,consumption_daily_total,${historicalDate}T23:00:00Z`n"
+        $historicalBody = @{ csv = $historicalCsv; source = 'SYNTHETIC HTTP RECOVERY VERIFICATION ONLY'; confirmCompleteDailyTotals = $true }
+        $historicalPreview = Invoke-RestMethod -Uri "$baseUrl/api/v1/ml/history/preview" -Headers $headers -Method Post -ContentType 'application/json' -Body ($historicalBody | ConvertTo-Json)
+        if (-not $historicalPreview.canCommit -or $historicalPreview.errorCount -ne 0) { throw 'PostgreSQL historical preview failed.' }
+        $historicalBody.previewToken = $historicalPreview.previewToken
+        $historicalCommit = Invoke-RestMethod -Uri "$baseUrl/api/v1/ml/history/commit" -Headers $headers -Method Post -ContentType 'application/json' -Body ($historicalBody | ConvertTo-Json)
+        if ($historicalCommit.importedRows -ne 1 -or $historicalCommit.stockChanged) { throw 'PostgreSQL historical import summary failed.' }
+        $historicalRepeat = Invoke-WebRequest -Uri "$baseUrl/api/v1/ml/history/commit" -Headers $headers -Method Post -ContentType 'application/json' -Body ($historicalBody | ConvertTo-Json) -SkipHttpErrorCheck
+        if ($historicalRepeat.StatusCode -ne 409) { throw 'Repeated historical import was not blocked.' }
+        if ((Invoke-RestMethod -Uri "$baseUrl/api/v1/stock/$itemId" -Headers $headers).systemStock -ne 6) { throw 'Historical import changed current stock.' }
+        $applicationTimer.Stop(); $recoveryTimer.Stop()
+        $recoveryMetrics.ApplicationVerificationSeconds = $applicationTimer.Elapsed.TotalSeconds
+        $recoveryMetrics.RestoreToVerifiedApplicationSeconds = $recoveryTimer.Elapsed.TotalSeconds
+        $recoveryMetrics.CoreWorkflows = @('readiness','owner-login','unauthenticated-401','inventory-read-write','purchase-read-lines','reports','AI-explicit-unavailable','restored-model-inference-export','audit','historical-preview-commit-duplicate-rejection-without-stock-mutation')
+        $recoveryReportPath = Join-Path $repositoryRoot "TestResults/phase4-recovery-$runId.json"
+        $recoveryMetrics | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $recoveryReportPath
         $httpSql = @"
 SELECT CASE WHEN (SELECT "CurrentStock" FROM "CatalogItems" WHERE "Id"='$itemId')=6
 AND EXISTS (SELECT 1 FROM "StockMovements" WHERE "CatalogItemId"='$itemId' AND "QuantityDelta"=1)
@@ -215,8 +290,11 @@ AND (SELECT COUNT(*) FROM "MlPredictionLogs" WHERE "CatalogItemId"='$itemId')=1 
         $ordered = $latencies | Sort-Object
         Write-Output ("Synthetic restored-model HTTP inference, 20 sequential warm requests: median {0:F1} ms, p95 {1:F1} ms. This is not representative production load." -f $ordered[9], $ordered[18])
 
+        if ($RunLoad) {
+            . (Join-Path $PSScriptRoot 'measure-private-load.ps1')
+        }
         $env:PGPASSWORD = $runnerPassword
-        Invoke-CheckedNative 'dotnet' @('test','backend/PurchaseAssistant.IntegrationTests/PurchaseAssistant.IntegrationTests.csproj','--configuration','Release','--logger','console;verbosity=minimal') 'PostgreSQL regression suite against the restored database'
+        Invoke-CheckedNative 'dotnet' @('test' ,'backend/PurchaseAssistant.IntegrationTests/PurchaseAssistant.IntegrationTests.csproj','--configuration','Release','--logger','console;verbosity=minimal') 'PostgreSQL regression suite against the restored database'
         Write-Output "Restore rehearsal passed: $($beforeCounts.Count) table row counts matched; migrations and readiness passed; real owner login, stock HTTP mutation, ledger/audit persistence, offline ML extraction/training, HTTP forecast/export and prediction deduplication passed against synthetic restored records; unauthenticated endpoint returned 401. Private test database: $targetName"
     }
     finally { Pop-Location }

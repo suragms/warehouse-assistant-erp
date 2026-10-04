@@ -131,6 +131,10 @@ builder.Services.AddHttpClient<OpenAIProvider>();
 builder.Services.AddHttpClient<GeminiProvider>();
 builder.Services.AddHttpClient<GroqProvider>();
 builder.Services.AddHttpClient<OpenRouterProvider>();
+// Fixed provider hosts must not forward credentials through redirects or buffer unbounded responses.
+foreach (var providerName in new[] { nameof(OpenAIProvider), nameof(GeminiProvider), nameof(GroqProvider), nameof(OpenRouterProvider) })
+    builder.Services.AddHttpClient(providerName, client => { client.Timeout = TimeSpan.FromSeconds(20); client.MaxResponseContentBufferSize = 1_000_000; })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false }).RemoveAllLoggers();
 builder.Services.AddScoped<IAIProvider>(sp => new OpenAIProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(OpenAIProvider)), builder.Configuration["AI:Providers:OpenAI:ApiKey"] ?? ""));
 builder.Services.AddScoped<IAIProvider>(sp => new GeminiProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GeminiProvider)), builder.Configuration["AI:Providers:Gemini:ApiKey"] ?? ""));
 builder.Services.AddScoped<IAIProvider>(sp => new GroqProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GroqProvider)), builder.Configuration["AI:Providers:Groq:ApiKey"] ?? ""));

@@ -5,6 +5,8 @@ using PurchaseAssistant.Infrastructure.Services;
 using PurchaseAssistant.ML;
 using System.Text.Json;
 using System.Security.Cryptography;
+using System.Data.Common;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 // Offline operator tool. Connection strings are accepted only through environment/local secrets, never arguments or logs.
 if (args.Length == 0 || args[0] is not ("inspect" or "extract" or "train" or "compare" or "promote" or "rollback")) {
@@ -33,7 +35,10 @@ try {
             || dataset.Items.Select(x => x.ItemId).Distinct().Count() != dataset.Items.Count) throw new InvalidDataException();
         if (Directory.Exists(args[2])) throw new ArgumentException("Choose a new candidate directory; training never replaces installed models.");
         var store = new ArtifactStore(args[2]); var trained = 0; var unavailable = 0; var evaluations = new List<(ModelArtifact Artifact, double Volume, double ZeroFraction)>();
-        var codeVersion = "ml-binary-sha256:" + Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(typeof(ForecastModel).Assembly.Location))).ToLowerInvariant();
+        var binaries = new[] { typeof(ForecastModel).Assembly.Location, typeof(AppDbContext).Assembly.Location, typeof(TrainingDataset).Assembly.Location };
+        var binaryHashes = new List<byte>();
+        foreach (var binary in binaries) binaryHashes.AddRange(SHA256.HashData(await File.ReadAllBytesAsync(binary)));
+        var codeVersion = "pipeline-binaries-sha256:" + Convert.ToHexString(SHA256.HashData(binaryHashes.ToArray())).ToLowerInvariant();
         foreach (var item in dataset.Items) {
             var prepared = UsageData.Prepare(item.Observations, DateOnly.FromDateTime(dataset.ExtractedAt), dataset.ExtractedAt);
             if (prepared.Series.Count < UsageData.MinimumDays) { unavailable++; continue; }
@@ -51,7 +56,7 @@ try {
                     MeanDefinedItemMape = g.Where(x => x.Artifact.TestMetrics.Mape != null).Select(x => x.Artifact.TestMetrics.Mape).DefaultIfEmpty().Average(), BaselineMeanItemMae = g.Average(x => x.Artifact.BaselineTestMetrics.Mae) });
             await using var report = new FileStream(Path.Combine(args[2], "evaluation-report.json"), FileMode.CreateNew);
             await JsonSerializer.SerializeAsync(report, new { dataset.BusinessId, WarehouseId = dataset.BusinessId, dataset.ExtractedAt, codeVersion, trained, unavailable,
-                Overall = new { Items = trained, MeanDefinedItemWape = evaluations.Where(x => x.Artifact.TestMetrics.Wape != null).Select(x => x.Artifact.TestMetrics.Wape).DefaultIfEmpty().Average() },
+                Overall = new { Items = trained, ByUnit = evaluations.GroupBy(x => x.Artifact.Unit).Select(g => new { Unit = g.Key, Items = g.Count(), MacroItemMae = g.Average(x => x.Artifact.TestMetrics.Mae), MacroItemRmse = g.Average(x => x.Artifact.TestMetrics.Rmse), MacroDefinedItemMape = g.Where(x => x.Artifact.TestMetrics.Mape != null).Select(x => x.Artifact.TestMetrics.Mape).DefaultIfEmpty().Average(), MacroDefinedItemWape = g.Where(x => x.Artifact.TestMetrics.Wape != null).Select(x => x.Artifact.TestMetrics.Wape).DefaultIfEmpty().Average() }), MeanDefinedItemWape = evaluations.Where(x => x.Artifact.TestMetrics.Wape != null).Select(x => x.Artifact.TestMetrics.Wape).DefaultIfEmpty().Average() },
                 Cohorts = cohorts, Items = evaluations.Select(x => new { x.Artifact.ItemId, x.Artifact.Unit, DatasetSize = x.Artifact.TrainingHistory.Count, x.Artifact.DatasetVersion, x.Artifact.Version, x.Artifact.Model.Name,
                     x.Artifact.ValidationStart, x.Artifact.ValidationEnd, x.Artifact.TestStart, x.Artifact.TestEnd, x.Artifact.ValidationMetrics, x.Artifact.TestMetrics, x.Artifact.BaselineTestMetrics, x.Artifact.QualityAccepted }),
                 Limitations = "Thirty-day recursive windows; cohorts are determined from pre-validation history within each unit. Macro item metrics are not pooled accuracy. Current model comparison requires compare with untouched dates. Provenance must be approved separately; synthetic input does not establish business accuracy." });
@@ -65,7 +70,9 @@ try {
         connection = secrets.RootElement.TryGetProperty("ConnectionStrings:DefaultConnection", out var value) ? value.GetString() : null;
     }
     if (string.IsNullOrWhiteSpace(connection)) throw new ArgumentException("Configure ML_DATABASE or explicitly select local development secrets.");
-    var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).Options;
+    var queryMetrics = new DatasetQueryMetrics();
+    var extractionWatch = System.Diagnostics.Stopwatch.StartNew();
+    var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).AddInterceptors(queryMetrics).Options;
     if (command == "inspect") {
         await using var db = new AppDbContext(options);
         // Metadata only. Does not read keys, personal records, stock values or purchase prices.
@@ -87,7 +94,7 @@ try {
     // Explicit output, no overwrite of a preexisting extraction.
     await using var file = new FileStream(Path.GetFullPath(args[2]), FileMode.CreateNew, FileAccess.Write, FileShare.None);
     await JsonSerializer.SerializeAsync(file, new TrainingDataset(business, now, output));
-    Console.WriteLine(JsonSerializer.Serialize(new { items = output.Count, observations = output.Sum(x => x.Observations.Count) })); return 0;
+    Console.WriteLine(JsonSerializer.Serialize(new { items = output.Count, observations = output.Sum(x => x.Observations.Count), queryMetrics.QueryCount, queryMetrics.DatabaseMilliseconds, queryMetrics.SlowestQueryMilliseconds, ExtractionSeconds = extractionWatch.Elapsed.TotalSeconds })); return 0;
 } catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or JsonException or Npgsql.NpgsqlException) {
     Console.Error.WriteLine("ML operation failed. Check input, database schema/access and storage configuration. No connection or record details are logged."); return 1;
 }
@@ -95,3 +102,14 @@ try {
 record TrainingDataset(Guid BusinessId, DateTime ExtractedAt, List<TrainingItem> Items);
 record TrainingItem(Guid ItemId, string Unit, List<UsageObservation> Observations);
 sealed class Tenant(Guid business) : ITenantProvider { public Guid GetBusinessId() => business; }
+
+sealed class DatasetQueryMetrics : DbCommandInterceptor
+{
+    public int QueryCount { get; private set; }
+    public double DatabaseMilliseconds { get; private set; }
+    public double SlowestQueryMilliseconds { get; private set; }
+    public override ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken ct = default) {
+        QueryCount++; DatabaseMilliseconds += eventData.Duration.TotalMilliseconds; SlowestQueryMilliseconds = Math.Max(SlowestQueryMilliseconds, eventData.Duration.TotalMilliseconds);
+        return ValueTask.FromResult(result);
+    }
+}

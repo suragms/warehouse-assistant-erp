@@ -76,6 +76,8 @@ namespace PurchaseAssistant.IntegrationTests.Stock
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SecurityAuditLogs\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"ChecklistCompletion\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"DailyUsageLogs\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"HistoricalUsageRows\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"HistoricalUsageBatches\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"DailyOperationSnapshots\" WHERE \"BusinessId\" = {0}", _businessId);
             // Clean up in reverse FK order to avoid constraint errors
             await _context.Database.ExecuteSqlRawAsync(

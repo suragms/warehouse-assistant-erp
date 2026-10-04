@@ -15,7 +15,8 @@ public record AIResponse(
     string? Error,
     string Provider,
     string ModelUsed,
-    [property: OperationalNumeric] decimal LatencyMs
+    [property: OperationalNumeric] decimal LatencyMs,
+    int? RetryAfterMilliseconds = null
 );
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

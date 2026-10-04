@@ -71,7 +71,10 @@ public class AIRoutingService : IAIRoutingService
                     try { response = await provider.SendRequestAsync(configuredRequest, deadline.Token); }
                     catch (OperationCanceledException) when (!ct.IsCancellationRequested) { response = response with { Error = "AI_PROVIDER_TIMEOUT" }; }
                     if (response.Success) break;
-                    if (attempt < policy.Retries) await Task.Delay(TimeSpan.FromMilliseconds(200), ct);
+                    if (!ProviderErrors.Retryable(response.Error)) break;
+                    // A long upstream backoff is not shortened: defer this provider and use the bounded fallback path.
+                    if (response.RetryAfterMilliseconds > 2000) break;
+                    if (attempt < policy.Retries) await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(2000, Math.Max(200, response.RetryAfterMilliseconds ?? 0) + Random.Shared.Next(0, 101))), ct);
                 }
                 if (response.Success)
                 {

@@ -76,18 +76,29 @@ public class MlService(AppDbContext db, ICurrentUserService user, ArtifactStore 
         var start = now.AddDays(-180);
         var movements = await db.StockMovements.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == item && x.CreatedAt >= start && x.CreatedAt <= now && x.QuantityDelta != 0)
             .OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Id).Take(2000).ToListAsync(ct);
+        return AnalyzeMovementHistory(movements, now);
+    }
+    public static List<MovementAnomaly> AnalyzeMovementHistory(IReadOnlyList<StockMovement> movements, DateTime now)
+    {
         var found = new List<MovementAnomaly>();
-        foreach (var row in movements.Where(x => x.CreatedAt >= now.AddDays(-30))) {
-            var prior = movements.Where(x => x.MovementType == row.MovementType && x.QuantityDelta * row.QuantityDelta > 0 && x.CreatedAt < row.CreatedAt).OrderByDescending(x => x.CreatedAt).Take(60).Select(x => Math.Abs((double)x.QuantityDelta)).Order().ToArray();
-            if (prior.Length < 20) continue;
-            var median = prior[prior.Length / 2]; var deviations = prior.Select(x => Math.Abs(x - median)).Order().ToArray();
-            var mad = deviations[deviations.Length / 2]; var quantity = Math.Abs((double)row.QuantityDelta);
-            // Degenerate constant histories have no estimated scale; use an explicit 3x historical-range rule.
-            var score = mad > 0 ? .67448975 * Math.Abs(quantity - median) / mad : 0;
-            if (score >= 3.5 || (mad == 0 && median > 0 && quantity > median * 3)) found.Add(new(row.Id, row.CreatedAt, row.MovementType, row.QuantityDelta, Math.Round(score, 2),
-                mad > 0 ? $"Quantity differs from the median of {prior.Length} earlier movements of the same type and direction (robust z-score {score:0.00}). Review the source transaction; this is not evidence of fraud." : "Quantity is more than three times the constant recent historical median. Review the source transaction; this is not evidence of fraud."));
+        foreach (var group in movements.Where(x => x.QuantityDelta != 0).GroupBy(x => (x.MovementType, Direction: Math.Sign(x.QuantityDelta)))) {
+            var prior = new Queue<double>();
+            // Equal-time rows cannot be each other's prior observations. Stable ID order preserves cutoff tie behavior.
+            foreach (var instant in group.OrderBy(x => x.CreatedAt).ThenByDescending(x => x.Id).GroupBy(x => x.CreatedAt)) {
+                if (prior.Count >= 20 && instant.Key >= now.AddDays(-30)) {
+                    var values = prior.Order().ToArray(); var median = values[values.Length / 2];
+                    var deviations = values.Select(x => Math.Abs(x - median)).Order().ToArray(); var mad = deviations[deviations.Length / 2];
+                    foreach (var row in instant) {
+                        var quantity = Math.Abs((double)row.QuantityDelta); var score = mad > 0 ? .67448975 * Math.Abs(quantity - median) / mad : 0;
+                        if (score >= 3.5 || (mad == 0 && median > 0 && quantity > median * 3)) found.Add(new(row.Id, row.CreatedAt, row.MovementType, row.QuantityDelta, Math.Round(score, 2),
+                            mad > 0 ? $"Quantity differs from the median of {values.Length} earlier movements of the same type and direction (robust z-score {score:0.00}). Review the source transaction; this is not evidence of fraud."
+                                : "Quantity is more than three times the constant recent historical median. Review the source transaction; this is not evidence of fraud."));
+                    }
+                }
+                foreach (var row in instant) { prior.Enqueue(Math.Abs((double)row.QuantityDelta)); if (prior.Count > 60) prior.Dequeue(); }
+            }
         }
-        return found.Take(50).ToList();
+        return found.OrderByDescending(x => x.Date).ThenBy(x => x.Id).Take(50).ToList();
     }
     public async Task<List<PredictionOutcome>> MonitoringAsync(Guid itemId, CancellationToken ct)
     {

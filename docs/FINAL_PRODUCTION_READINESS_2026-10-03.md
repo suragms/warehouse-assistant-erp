@@ -1,5 +1,7 @@
 # Final production readiness — Phase 3
 
+Historical verification snapshot. The [Phase 4 report](FINAL_PRODUCTION_VERIFICATION_2026-10-04.md) records newer hardening, tests, measured recovery/load and remaining environmental gates. Phase 3 counts below remain historical evidence.
+
 Updated 2026-10-04. **YELLOW — Production Candidate.** Local feature implementation and regression gates are verified; external accounts, real ML data and production-environment qualification remain. This is not approval to deploy synthetic data or a claim of live delivery.
 
 ## Delivered

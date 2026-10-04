@@ -52,7 +52,7 @@ public class AiResilienceTests
         var user = new Mock<ICurrentUserService>(); user.SetupGet(x => x.BusinessId).Returns(id);
         var provider = new Mock<IAIProvider>(); var factory = new Mock<IAIProviderFactory>();
         factory.Setup(x => x.GetProviderAsync(AIProviderType.OpenAI, It.IsAny<CancellationToken>())).ReturnsAsync(provider.Object);
-        provider.Setup(x => x.SendRequestAsync(It.IsAny<AIRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(new AIResponse(false, null, "failure", "OpenAI", "model", 0));
+        provider.Setup(x => x.SendRequestAsync(It.IsAny<AIRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(new AIResponse(false, null, "AI_PROVIDER_UNAVAILABLE", "OpenAI", "model", 0));
         var clock = new Mock<TimeProvider>(); var now = DateTimeOffset.UtcNow; clock.Setup(x => x.GetUtcNow()).Returns(() => now);
         var circuit = new AiCircuitBreaker(clock.Object);
         var routing = new AIRoutingService(factory.Object, Mock.Of<ILogger<AIRoutingService>>(), Options.Create(new AiOptions { Enabled = true }), settings: new(db, user.Object), circuit: circuit);

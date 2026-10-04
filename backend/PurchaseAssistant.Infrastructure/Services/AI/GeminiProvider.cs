@@ -32,12 +32,12 @@ public class GeminiProvider : IAIProvider, IAIProviderReadiness
                 }
             };
 
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(request.ModelOverride ?? "gemini-1.5-flash")}:generateContent");
             httpRequest.Headers.Add("x-goog-api-key", _apiKey);
             httpRequest.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
 
             using var response = await _httpClient.SendAsync(httpRequest, ct);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) return ProviderErrors.Failure(response, ProviderType.ToString(), request.ModelOverride ?? "default", (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds);
 
             using var data = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
             string? content = data.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
@@ -45,21 +45,25 @@ public class GeminiProvider : IAIProvider, IAIProviderReadiness
             return new AIResponse(
                 Success: !string.IsNullOrWhiteSpace(content),
                 Content: content,
-                Error: null,
+                Error: string.IsNullOrWhiteSpace(content) ? "AI_EMPTY_RESPONSE" : null,
                 Provider: ProviderType.ToString(),
-                ModelUsed: "gemini-1.5-flash",
+                ModelUsed: request.ModelOverride ?? "gemini-1.5-flash",
                 LatencyMs: (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds
             );
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (System.Net.Http.HttpRequestException ex)
+        {
+            return new AIResponse(false, null, ex.HttpRequestError == HttpRequestError.ConfigurationLimitExceeded ? "AI_RESPONSE_TOO_LARGE" : ProviderErrors.Normalize(ex.StatusCode), ProviderType.ToString(), request.ModelOverride ?? "default", (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds);
+        }
         catch (Exception)
         {
             return new AIResponse(
                 Success: false,
                 Content: null,
-                Error: "AI_PROVIDER_FAILED",
+                Error: "AI_RESPONSE_INVALID",
                 Provider: ProviderType.ToString(),
-                ModelUsed: "gemini-1.5-flash",
+                ModelUsed: request.ModelOverride ?? "gemini-1.5-flash",
                 LatencyMs: (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds
             );
         }

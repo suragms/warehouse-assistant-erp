@@ -51,10 +51,10 @@ try {
         for (var cycle = 0; cycle < 6; cycle++) {
             await Request(client, "login", HttpMethod.Post, "/api/v1/auth/login", new { email = Environment.GetEnvironmentVariable("WA_LOAD_EMAIL"), password = Environment.GetEnvironmentVariable("WA_LOAD_PASSWORD") });
             await Request(client, "dashboard", HttpMethod.Get, "/api/v1/dashboard");
-            await Request(client, "product-search", HttpMethod.Get, "/api/v1/catalog?page=1&pageSize=50&search=Load");
+            await Request(client, "product-search", HttpMethod.Get, "/api/v1/catalog/items?page=1&pageSize=50&search=Load");
             await Request(client, "stock-list", HttpMethod.Get, "/api/v1/stock?page=1&pageSize=50");
             var stock = await Request(client, "stock-read", HttpMethod.Get, "/api/v1/stock/" + items[worker]);
-            if (stock != null) await Request(client, "stock-update", HttpMethod.Post, "/api/v1/stock/" + items[worker] + "/adjust", new { quantityDelta = 1, reason = "Synthetic isolated load rehearsal", expectedVersion = stock.Value.GetProperty("rowVersion").GetUInt32() });
+            if (stock != null) await Request(client, "stock-update", HttpMethod.Post, "/api/v1/stock/" + items[worker] + "/adjust", new { quantityDelta = 1, reason = "Synthetic isolated load rehearsal", expectedVersion = stock.Value.GetProperty("rowVersion").GetString() });
             var purchase = new JsonObject { ["supplierId"] = Environment.GetEnvironmentVariable("WA_LOAD_SUPPLIER"), ["orderNumber"] = "LOAD-" + Guid.NewGuid().ToString("N"), ["notes"] = "Synthetic isolated load rehearsal",
                 ["items"] = new JsonArray(new JsonObject { ["catalogItemId"] = items[worker], ["unit"] = "PCS", ["orderedQuantity"] = 1, ["unitPrice"] = 1, ["discountPercent"] = 0, ["taxPercent"] = 0 }) };
             var preview = await Request(client, "purchase-preview", HttpMethod.Post, "/api/v1/purchases/preview", purchase);

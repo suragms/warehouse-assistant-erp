@@ -1,5 +1,11 @@
 # ML model card — Phase 3
 
+## Phase 4 update — 2026-10-04
+
+No eligible real historical dataset, operational ML connection or production artifact was available. **ML pipeline is production-capable but production model validation is blocked by absence of eligible historical business data.** Real dataset size, source period, item/warehouse counts, validation/holdout dates and production MAE/RMSE/WAPE/MAPE remain unavailable. The synthetic results below remain implementation evidence only.
+
+Added attested historical daily-consumption CSV preview/transactional import, immutable raw/source provenance, scoped dataset extraction, per-unit/cohort reports, compiled-pipeline code fingerprints, guarded candidate promotion with untouched-date comparison and rollback, and complete-outcome degradation metrics/review alerts. No production model was promoted. See [import/promotion contract](HISTORICAL_CONSUMPTION_AND_MODEL_PROMOTION_2026-10-04.md) and [Phase 4 verification](FINAL_PRODUCTION_VERIFICATION_2026-10-04.md). Core features, temporal windows and baseline remain unchanged; metadata now includes the recorded code version. Legacy artifacts can serve under existing safeguards, but cannot be promoted as new candidates without that evidence.
+
 Last verified 2026-10-04. **Production deployment: not trained or approved. Real-business accuracy: not measured.** The pipeline is implemented; no eligible operational dataset or production database connection was supplied. Do not deploy the verification artifact below.
 
 ## Intended use
@@ -16,7 +22,7 @@ Human-reviewed planning of 7/14/30-day recorded item consumption in one Business
 | Selection | Validation MAE; ridge must beat the better baseline by >1% |
 | Holdout gate | Selected MAE ≤ 1.1 × baseline MAE, plus numerical tolerance |
 | Framework | C#/.NET 10, version embedded in each artifact; no external ML runtime |
-| Label | Explicitly confirmed `DailyUsageLogs.UsedQty` |
+| Label | Explicitly confirmed `DailyUsageLogs.UsedQty` or validated, owner-attested historical daily-consumption totals; never purchases/snapshots relabelled as consumption |
 | Features | Lag 1/7/14; mean 7/28; weekday sine/cosine |
 | Scope | Independently trained per Business and item; fixed item unit |
 | Eligibility | 120–730 consecutive completed UTC days through extraction's yesterday |
@@ -46,7 +52,7 @@ Missing days are unknown, not zero. Explicit zeros are valid. Invalid/negative/n
 | R² | 0.998580 | 0.437134 |
 | Days / nonzero days | 30 / 30 | 30 / 30 |
 
-Two CLI runs returned identical model parameters, metrics and versions. Synthetic dataset hash: `8ccce22428dce5a1e4cbc815acc104585e89ce5b19e3b327abe7f8cc6c84b3d3`. Artifact version appends `-daily-confirmed-usage-v1-ridge`. Evidence is in ignored `TestResults/phase3-ml-repro.log`; rerun the script to generate fresh artifacts. No generated model or dataset is committed.
+Two CLI runs returned identical model parameters, metrics and versions. Synthetic dataset hash: `8ccce22428dce5a1e4cbc815acc104585e89ce5b19e3b327abe7f8cc6c84b3d3`. Artifact version appends `-daily-confirmed-usage-v1-ridge`. Latest evidence is in ignored `TestResults/phase4-ml-repro.log` (earlier checkpoint: `phase3-ml-repro.log`); rerun the script to generate fresh artifacts. No generated model or dataset is committed.
 
 ## Limits and failure cases
 

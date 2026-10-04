@@ -17,7 +17,7 @@ Built with **ASP.NET Core (.NET 10)** following Clean Architecture principles on
 
 ## Current verification and ML
 
-Phase 3 is **YELLOW — Production Candidate**, not a production-deployment certification. See [current feature audit](docs/CURRENT_FEATURE_AUDIT_2026-10-03.md), [final feature matrix](docs/FINAL_PENDING_FEATURE_MATRIX_2026-10-03.md) and [validation/readiness report](docs/FINAL_PRODUCTION_READINESS_2026-10-03.md).
+Phase 4 is **YELLOW — Production Candidate**, not a production-deployment certification. See the [current verification matrix](docs/FINAL_PRODUCTION_VERIFICATION_2026-10-04.md), [historical consumption and model promotion](docs/HISTORICAL_CONSUMPTION_AND_MODEL_PROMOTION_2026-10-04.md), [measured recovery rehearsal](docs/PRODUCTION_RECOVERY_REHEARSAL_2026-10-04.md) and [load/database evidence](docs/LOAD_AND_DATABASE_VERIFICATION_2026-10-04.md). The Phase 3 audit/matrix remain historical references.
 
 The application now includes Predictions, supplier purchase/price history, owner audit history, broader notifications, authenticated password changes, provider policy controls, reviewed invoice-text extraction, owner-confirmed WhatsApp quantity PDFs, barcode labels and supported-browser camera lookup. External integrations still require configured accounts and deployment verification.
 

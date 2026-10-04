@@ -1,5 +1,7 @@
 # Final pending feature matrix — Phase 3
 
+Historical Phase 3 boundary: [Phase 4 verification](FINAL_PRODUCTION_VERIFICATION_2026-10-04.md) supersedes remaining import, promotion, recovery/load and provider-hardening evidence. Historical **consumption** import is now implemented; the old synthetic **purchase** preview remains read-only and is not used as demand. Real input/account/production/device requirements still apply.
+
 Updated 2026-10-04 after implementation and verification. Initial categories are retained for traceability. COMPLETE means the supported local workflow has implementation and automated evidence, not production deployment or external-service qualification.
 
 | ID | Work | Initial category | Final category | Evidence / boundary |

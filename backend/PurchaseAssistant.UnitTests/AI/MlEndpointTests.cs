@@ -12,7 +12,7 @@ namespace PurchaseAssistant.UnitTests.AI;
 
 public partial class PurchaseIntentEndpointTests
 {
-    [Theory] [InlineData("/ml/items")] [InlineData("/ml/items/11111111-1111-1111-1111-111111111111")] [InlineData("/ml/items/11111111-1111-1111-1111-111111111111/monitoring")]
+    [Theory] [InlineData("/ml/items")] [InlineData("/ml/items/11111111-1111-1111-1111-111111111111")] [InlineData("/ml/items/11111111-1111-1111-1111-111111111111/monitoring")] [InlineData("/ml/items/11111111-1111-1111-1111-111111111111/monitoring-summary")]
     public async Task MlRequiresAuthenticationBusinessAndCurrentPermission(string path)
     {
         using var factory = new Factory { Permission = "catalog.view" }; using var client = factory.CreateClient();
@@ -29,6 +29,7 @@ public partial class PurchaseIntentEndpointTests
         var items = await client.GetStringAsync("/api/v1/ml/items"); Assert.Contains("Local", items); Assert.DoesNotContain("Private", items);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/ml/items/{foreign.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/ml/items/{foreign.Id}/monitoring")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/ml/items/{foreign.Id}/monitoring-summary")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/v1/ml/items/{local.Id}?horizon=999")).StatusCode);
         var result = await client.GetFromJsonAsync<MlAnalysis>($"/api/v1/ml/items/{local.Id}"); Assert.Equal("insufficient_history", result!.Status); Assert.Empty(result.Forecast); Assert.Null(result.Reorder);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/v1/ml/items?pageSize=100000")).StatusCode);

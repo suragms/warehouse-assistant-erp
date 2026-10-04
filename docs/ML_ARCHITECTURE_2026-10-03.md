@@ -1,5 +1,7 @@
 # ML architecture — Phase 3
 
+Phase 4 adds trusted historical-consumption provenance, chunked extraction, candidate-only training, guarded promotion/rollback and degradation summaries. The [Phase 4 contract](HISTORICAL_CONSUMPTION_AND_MODEL_PROMOTION_2026-10-04.md) supersedes the operator storage/import details below. Training now refuses an existing candidate directory; replacing a serving artifact requires the explicit promotion path. No real-data accuracy is available.
+
 Implemented and verified locally on 2026-10-04. File date follows the requested Phase 3 naming convention. See [model card](ML_MODEL_CARD_2026-10-03.md) for the distinction between pipeline verification and production accuracy.
 
 ## Problem and available data
