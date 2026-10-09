@@ -62,11 +62,21 @@ export default function PurchaseDetail() {
     setReceiveQuantities(prev => ({ ...prev, [itemId]: qty }));
   };
 
+  const handleFillAllRemaining = () => {
+    if (!order) return;
+    const filled: Record<string, number> = {};
+    order.items.forEach(item => {
+      const remaining = Math.max(0, item.orderedQuantity - item.receivedQuantity);
+      if (remaining > 0) filled[item.id] = remaining;
+    });
+    setReceiveQuantities(filled);
+  };
+
   const handleReceiveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!order || receiveMutation.isPending) return;
 
-    const itemsToReceive = order.items.map(item => {
+    let itemsToReceive = order.items.map(item => {
       const delta = receiveQuantities[item.id] || 0;
       return {
         purchaseItemId: item.id,
@@ -76,8 +86,20 @@ export default function PurchaseDetail() {
     }).filter(i => i.receivedQuantityDelta > 0);
 
     if (itemsToReceive.length === 0) {
-      alert('Please enter at least one positive received quantity to log.');
-      return;
+      const remainingItems = order.items
+        .map(item => ({
+          purchaseItemId: item.id,
+          receivedQuantityDelta: Math.max(0, item.orderedQuantity - item.receivedQuantity),
+          notes: receiveNotes[item.id] || undefined
+        }))
+        .filter(i => i.receivedQuantityDelta > 0);
+
+      if (remainingItems.length > 0) {
+        itemsToReceive = remainingItems;
+      } else {
+        alert('All items in this purchase order have already been fully received.');
+        return;
+      }
     }
 
     receiveMutation.mutate({ items: itemsToReceive, expectedVersion: order.version });
@@ -244,7 +266,20 @@ export default function PurchaseDetail() {
                   <th className="py-3 px-4 text-right">Unit Price</th>
                   <th className="py-3 px-4 text-right">Line Total</th>
                   {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
-                    <th className="py-3 px-4 bg-indigo-50/50 text-indigo-900 text-right">Receive Now (Delta)</th>
+                    <th className="py-3 px-4 bg-indigo-50/50 text-indigo-900 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span>Receive Now (Delta)</span>
+                        {order.items.some(i => i.orderedQuantity - i.receivedQuantity > 0) && (
+                          <button
+                            type="button"
+                            onClick={handleFillAllRemaining}
+                            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2 py-0.5 rounded shadow-xs transition-colors"
+                          >
+                            Fill All
+                          </button>
+                        )}
+                      </div>
+                    </th>
                   )}
                 </tr>
               </thead>
@@ -261,17 +296,29 @@ export default function PurchaseDetail() {
                     <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatMoney(item.lineTotal)}</td>
                     {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
                       <td className="py-3 px-4 bg-indigo-50/30 text-right">
-                        <input
-                          type="number"
-                          aria-label={`Receive quantity for ${item.catalogItemName}`}
-                          min="0"
-                          max={item.orderedQuantity - item.receivedQuantity}
-                          step="any"
-                          placeholder="0"
-                          value={receiveQuantities[item.id] || ''}
-                          onChange={(e) => handleReceiveChange(item.id, parseFloat(e.target.value) || 0)}
-                          className="w-28 px-3 py-1.5 text-right text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <input
+                            type="number"
+                            aria-label={`Receive quantity for ${item.catalogItemName}`}
+                            min="0"
+                            max={Math.max(0, item.orderedQuantity - item.receivedQuantity)}
+                            step="any"
+                            placeholder={Math.max(0, item.orderedQuantity - item.receivedQuantity).toString()}
+                            value={receiveQuantities[item.id] !== undefined ? receiveQuantities[item.id] : ''}
+                            onChange={(e) => handleReceiveChange(item.id, parseFloat(e.target.value) || 0)}
+                            className="w-24 px-2.5 py-1.5 text-right text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          {item.orderedQuantity - item.receivedQuantity > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleReceiveChange(item.id, item.orderedQuantity - item.receivedQuantity)}
+                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-1 py-0.5 rounded hover:bg-indigo-50 transition-colors"
+                              title="Fill remaining"
+                            >
+                              Max
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -291,11 +338,11 @@ export default function PurchaseDetail() {
             {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
               <button
                 type="submit"
-                disabled={receiveMutation.isPending}
+                disabled={receiveMutation.isPending || order.items.every(i => i.receivedQuantity >= i.orderedQuantity)}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors disabled:opacity-50"
               >
                 <PackageCheck className="w-5 h-5" />
-                Commit Received Items to Stock
+                {order.items.every(i => i.receivedQuantity >= i.orderedQuantity) ? 'All Items Already Received' : 'Commit Received Items to Stock'}
               </button>
             )}
           </div>

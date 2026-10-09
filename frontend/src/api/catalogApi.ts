@@ -285,6 +285,6 @@ export const catalogApi = {
     }
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const res = await apiClient.get(`/catalog/items/duplicates${queryString}`);
-    return res.data;
+    return Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
   }
 };

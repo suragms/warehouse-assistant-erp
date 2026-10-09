@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { catalogApi } from '../../api/catalogApi';
+import { catalogApi, type DuplicateCandidate } from '../../api/catalogApi';
 import { duplicateKeys, catalogKeys } from '../../lib/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../../components/ui/toastContext';
@@ -36,6 +36,8 @@ export default function DuplicateReview() {
     queryKey: duplicateKeys.list(threshold),
     queryFn: () => catalogApi.getDuplicateCandidates(threshold),
   });
+
+  const candidateList: DuplicateCandidate[] = Array.isArray(duplicates) ? duplicates : ((duplicates as any)?.data ?? []);
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) => catalogApi.deleteItem(id),
@@ -105,7 +107,7 @@ export default function DuplicateReview() {
         />
       )}
 
-      {!isLoading && !isError && duplicates?.length === 0 && (
+      {!isLoading && !isError && candidateList.length === 0 && (
         <EmptyState
           icon={<CopyX className="w-12 h-12" />}
           title="No duplicates found"
@@ -113,9 +115,9 @@ export default function DuplicateReview() {
         />
       )}
 
-      {!isLoading && !isError && duplicates && duplicates.length > 0 && (
+      {!isLoading && !isError && candidateList.length > 0 && (
         <div className="space-y-6">
-          {duplicates.map((pair) => (
+          {candidateList.map((pair) => (
             <Card key={`${pair.itemAId}-${pair.itemBId}`} className="p-4 sm:p-6">
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Item A */}
