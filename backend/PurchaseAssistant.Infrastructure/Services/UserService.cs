@@ -69,8 +69,7 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             ValidateRole(createUserDto.Role);
             RequireUserAdministrator();
-            if (createUserDto.Role == Domain.Enums.Role.Owner)
-                throw new ArgumentException("New accounts must be Admin, Manager or Staff.");
+
             ValidateProfile(createUserDto.Name, createUserDto.Email);
             if (string.IsNullOrWhiteSpace(createUserDto.Password) || createUserDto.Password.Length < 8
                 || System.Text.Encoding.UTF8.GetByteCount(createUserDto.Password) > 72)
@@ -267,10 +266,10 @@ namespace PurchaseAssistant.Infrastructure.Services
             // Managers can only create Staff
             var isPrivileged = _currentUser.Role is "Owner" or "Admin" or "SuperAdmin";
             if (!isPrivileged && role != Domain.Enums.Role.Staff)
-                throw new UnauthorizedAccessException("Managers can only assign the Staff role.");
+                throw new UnauthorizedAccessException("Owners and Managers can only assign the Staff role.");
 
-            if (role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
-                throw new UnauthorizedAccessException("Only an owner can assign an owner membership.");
+            if (role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Admin" or "SuperAdmin"))
+                throw new ArgumentException("Only an administrator can assign an Owner membership.");
         }
 
         private void RequireUserAdministrator()
@@ -293,7 +292,9 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             if (_currentUser.Role == "Manager" && membership.Role != Domain.Enums.Role.Staff)
                 throw new UnauthorizedAccessException("Managers can manage only Staff memberships.");
-            if (membership.Role == Domain.Enums.Role.SuperAdmin || membership.Role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
+            if (_currentUser.Role == "Owner" && membership.Role != Domain.Enums.Role.Staff)
+                throw new UnauthorizedAccessException("Owners can manage only Staff memberships.");
+            if (membership.Role == Domain.Enums.Role.SuperAdmin || (membership.Role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Admin" or "SuperAdmin")))
                 throw new UnauthorizedAccessException("You cannot modify this privileged membership.");
         }
     }

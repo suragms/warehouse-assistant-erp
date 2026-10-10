@@ -10,7 +10,7 @@ const field = 'block w-full min-w-0 border rounded p-3 mt-1';
 const names = { stock: 'Stock Excel', pdf: 'Monthly purchases PDF', json: 'Business JSON · last 90 days', zip: 'Purchase ZIP' };
 function deviceRead(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 export default function BackupPage() {
-  const user = useAuthStore(s => s.user); const owner = ['Owner', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
+  const user = useAuthStore(s => s.user); const owner = ['Owner', 'Admin', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
   const allowed = canExport(); const key = backupDeviceKey(); const cache = useQueryClient();
   const [preset, setPreset] = useState('month'), [notice, setNotice] = useState(''), [failure, setFailure] = useState(''), [text, setText] = useState('');
   const [automatic, setAutomatic] = useState(deviceRead(key + ':auto') === 'true'), [result, setResult] = useState<DryRun | null>(null);

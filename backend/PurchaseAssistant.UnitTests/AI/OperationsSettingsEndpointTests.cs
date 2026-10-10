@@ -128,7 +128,7 @@ public partial class PurchaseIntentEndpointTests
         var response = await client.GetAsync("/api/v1/operations/owner-dashboard"); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal(1, json.GetProperty("lowStockCount").GetInt32()); Assert.Equal(1, json.GetProperty("outOfStockCount").GetInt32());
-        Assert.Equal(role == Role.Owner, json.TryGetProperty("spendLast7Days", out _));
+        Assert.Equal(role is Role.Owner or Role.Admin, json.TryGetProperty("spendLast7Days", out _));
     }
 
     [Fact]

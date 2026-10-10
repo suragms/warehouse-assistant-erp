@@ -22,7 +22,7 @@ const button = 'px-4 py-3 rounded bg-emerald-800 text-white disabled:opacity-50'
 const section = 'rounded-xl border bg-white p-4 space-y-4 min-w-0';
 export default function SettingsPage() {
   const user = useAuthStore(s => s.user); const cache = useQueryClient(); const role = user?.currentBusiness?.role ?? '';
-  const owner = ['Owner', 'SuperAdmin'].includes(role), credentialOwner = ['Owner', 'Admin', 'SuperAdmin'].includes(role);
+  const owner = ['Owner', 'Admin', 'SuperAdmin'].includes(role), credentialOwner = ['Owner', 'Admin', 'SuperAdmin'].includes(role);
   const [draft, setDraft] = useState<Profile | null>(null), [prefsDraft, setPrefsDraft] = useState<Preferences | null>(null), [personalDraft, setPersonalDraft] = useState<string | null>(null);
   const [notice, setNotice] = useState(''), [uploadError, setUploadError] = useState(''), [credentialType, setCredentialType] = useState('openrouter_key'), [credentialValue, setCredentialValue] = useState('');
   const profile = useQuery({ queryKey: ['settings', 'business'], queryFn: async () => (await apiClient.get<Profile>('/settings/business')).data });

@@ -54,6 +54,7 @@ public sealed class OwnerFinancialResultFilter : IAsyncResultFilter
     {
         if (context.HttpContext.User.Identity?.IsAuthenticated == true
             && context.HttpContext.User.FindFirst("role")?.Value != "Owner"
+            && context.HttpContext.User.FindFirst("role")?.Value != "Admin"
             && context.HttpContext.User.FindFirst("role")?.Value != "SuperAdmin"
             && context.Result is ObjectResult { Value: not null } result && (result.StatusCode ?? 200) < 400)
         {

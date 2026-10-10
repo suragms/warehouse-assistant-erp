@@ -38,7 +38,7 @@ export default function PurchaseList() {
   const [selectedStatus, setSelectedStatus] = useState<PurchaseStatus | undefined>(undefined);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const role = useAuthStore(s => s.user?.currentBusiness?.role);
-  const financialOwner = role === 'Owner' || role === 'SuperAdmin';
+  const financialOwner = role === 'Owner' || role === 'Admin' || role === 'SuperAdmin';
   const [selected, setSelected] = useState<Set<string>>(new Set()), [copying, setCopying] = useState(false), [copyNotice, setCopyNotice] = useState(''), [copyError, setCopyError] = useState('');
 
   const { data: suppliersData } = useQuery({

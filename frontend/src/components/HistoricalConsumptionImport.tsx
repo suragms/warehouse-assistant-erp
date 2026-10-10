@@ -19,7 +19,7 @@ export default function HistoricalConsumptionImport() {
     } catch { setError(commit ? 'The import result could not be confirmed. Preview again; completed imports are detected and cannot be repeated.' : 'Preview failed. Check the CSV format, source, permissions and connection.'); setPreview(null); }
     finally { setBusy(false); }
   };
-  if (!['Owner', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '')) return null;
+  if (!['Owner', 'Admin', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '')) return null;
   return <details className="bg-white border rounded-xl p-4 space-y-3">
     <summary className="font-semibold cursor-pointer">Import historical consumption</summary>
     <p className="text-sm">Import complete daily totals from a trusted source. Purchases, stock corrections and snapshots are not consumption. Import does not change current stock.</p>

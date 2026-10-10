@@ -29,7 +29,7 @@ export type CsvKind = 'stock' | 'low-stock' | 'supplier' | 'report-suppliers' | 
 export async function downloadCsv(kind: CsvKind, params: { search?: string; filter?: string; start?: string; end?: string; categoryId?: string; supplierId?: string; severity?: string } = {}, supplierId?: string) {
   const scope = backupDeviceKey();
   const financial = ['supplier', 'report-suppliers', 'report-items'].includes(kind);
-  const owner = () => ['Owner', 'SuperAdmin'].includes(useAuthStore.getState().user?.currentBusiness?.role ?? '');
+  const owner = () => ['Owner', 'Admin', 'SuperAdmin'].includes(useAuthStore.getState().user?.currentBusiness?.role ?? '');
   if (!canExport() || (financial && !owner())) throw new Error('CSV export access is unavailable.');
   const routes = { stock: 'stock.csv', 'low-stock': 'low-stock.csv', supplier: `suppliers/${encodeURIComponent(supplierId ?? '')}/purchases.csv`, 'report-suppliers': 'reports/suppliers.csv', 'report-items': 'reports/items.csv' };
   try {
@@ -50,10 +50,10 @@ export function backupDeviceKey() {
 export function canExport() {
   const business = useAuthStore.getState().user?.currentBusiness;
   return !!business && ['Owner', 'Admin', 'Manager', 'SuperAdmin'].includes(business.role)
-    && (['Owner', 'SuperAdmin'].includes(business.role) || business.permissions.includes('reports.view'));
+    && (['Owner', 'Admin', 'SuperAdmin'].includes(business.role) || business.permissions.includes('reports.view'));
 }
 export function purchaseSelectionCsv(rows: readonly PurchaseOrderDto[]) {
-  if (!['Owner', 'SuperAdmin'].includes(useAuthStore.getState().user?.currentBusiness?.role ?? '')) throw new Error('Only the owner can export purchase financial values.');
+  if (!['Owner', 'Admin', 'SuperAdmin'].includes(useAuthStore.getState().user?.currentBusiness?.role ?? '')) throw new Error('Only the owner or admin can export purchase financial values.');
   if (!rows.length) throw new Error('Select purchases from the current page.');
   const cell = (value: string) => '"' + (/^[=+@\-\t\r]/.test(value) ? "'" : '') + value.replaceAll('"', '""') + '"';
   const statuses = ['Draft', 'Confirmed', 'Dispatched', 'Arrived', 'Verified', 'Completed', 'Cancelled'];

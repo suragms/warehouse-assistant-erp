@@ -24,7 +24,7 @@ export default function PurchaseDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const business = useAuthStore(state => state.user?.currentBusiness);
-  const can = (permission: string) => business?.role === 'Owner' || business?.role === 'SuperAdmin' || !!business?.permissions.includes(permission);
+  const can = (permission: string) => business?.role === 'Owner' || business?.role === 'Admin' || business?.role === 'SuperAdmin' || !!business?.permissions.includes(permission);
 
   const [success, setSuccess] = useState('');
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
@@ -122,7 +122,7 @@ export default function PurchaseDetail() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {['Owner', 'SuperAdmin'].includes(business?.role ?? '') && order.status !== PurchaseStatus.Draft && order.status !== PurchaseStatus.Cancelled && <WhatsAppDelivery purchaseId={order.id} />}
+      {['Owner', 'Admin', 'SuperAdmin'].includes(business?.role ?? '') && order.status !== PurchaseStatus.Draft && order.status !== PurchaseStatus.Cancelled && <WhatsAppDelivery purchaseId={order.id} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">

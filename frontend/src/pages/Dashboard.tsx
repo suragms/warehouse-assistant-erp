@@ -23,7 +23,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const canPurchase = hasPermission(user, 'purchase.view'), canStock = hasPermission(user, 'stock.view');
-  const canCreate = hasPermission(user, 'purchase.create'), canFinance = ['Owner', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
+  const canCreate = hasPermission(user, 'purchase.create'), canFinance = ['Owner', 'Admin', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: dashboardKeys.summary(),

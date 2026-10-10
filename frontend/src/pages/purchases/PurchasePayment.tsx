@@ -8,7 +8,7 @@ import { purchaseKeys, dashboardKeys, reportKeys } from '../../lib/queryKeys';
 import { Button, Input } from '../../components/ui';
 
 export default function PurchasePayment({ order }: { order: PurchaseOrderDto }) {
-  const owner = useAuthStore(s => s.user?.currentBusiness?.role === 'Owner');
+  const owner = useAuthStore(s => ['Owner', 'Admin', 'SuperAdmin'].includes(s.user?.currentBusiness?.role ?? ''));
   const client = useQueryClient(); const busy = useRef(false);
   const [open, setOpen] = useState(false); const [amount, setAmount] = useState('');
   const [error, setError] = useState(''); const [success, setSuccess] = useState('');

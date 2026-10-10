@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { formatMoney } from '../lib/formatMoney';
 
 export function SupplierPriceSuggestion({ supplierId, itemId, unit, onApply }: { supplierId: string; itemId: string; unit: string; onApply: (price: number) => void }) {
-  const user = useAuthStore(s => s.user); const owner = ['Owner', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
+  const user = useAuthStore(s => s.user); const owner = ['Owner', 'Admin', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
   const query = useQuery({ queryKey: ['supplier-price', user?.currentBusiness?.businessId, supplierId, itemId, unit], enabled: owner && !!supplierId && !!itemId,
     queryFn: async () => (await apiClient.get<{ unitPrice: number; date: string; unit: string }[]>(`/catalog/suppliers/${supplierId}/items/${itemId}/price-history`, { params: { unit } })).data });
   if (!owner || !supplierId || !itemId) return null;

@@ -18,7 +18,7 @@ export const PermissionGate: React.FC<{ permission: string; children: React.Reac
   const user = useAuthStore((s) => s.user);
 
   if (!user?.currentBusiness) return null;
-  if (user.currentBusiness.role === 'Owner' || user.currentBusiness.role === 'SuperAdmin') return <>{children}</>;
+  if (user.currentBusiness.role === 'Owner' || user.currentBusiness.role === 'Admin' || user.currentBusiness.role === 'SuperAdmin') return <>{children}</>;
 
   const hasPerm = user.currentBusiness.permissions?.includes(permission);
   return hasPerm ? <>{children}</> : null;
