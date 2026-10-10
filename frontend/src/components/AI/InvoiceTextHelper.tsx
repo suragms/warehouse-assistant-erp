@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MediaTextInput } from './MediaTextInput';
 import { useMutation } from '@tanstack/react-query';
 import apiClient from '../../api/apiClient';
 import type { PurchaseIntentItemCandidateDto } from '../../api/purchaseIntentApi';
@@ -8,6 +9,7 @@ export function InvoiceTextHelper({ apply, disabled }: { apply: (items: Purchase
   const [text, setText] = useState(''), [useAi, setUseAi] = useState(false);
   const preview = useMutation({ mutationFn: async () => (await apiClient.post<{ items: Line[]; unparsedLines: number; source: string; message: string }>('/ai/invoice-text', { text, useAi })).data });
   return <details className="border rounded-lg p-3 mt-4 min-w-0"><summary className="cursor-pointer font-medium">Extract pasted invoice text</summary><p className="text-sm my-2">Paste one line per item, such as “Rice 10 kg @ 50”. Review extracted quantities and enter prices in the purchase form.</p>
+    <MediaTextInput kind="ocr" disabled={disabled || preview.isPending} onText={value => { setText(value); preview.reset(); }} />
     <label className="block text-sm">Invoice text<textarea className="block border rounded p-2 w-full mt-1" rows={5} maxLength={20000} value={text} disabled={disabled || preview.isPending} onChange={e => { setText(e.target.value); preview.reset(); }} /></label>
     <label className="flex gap-2 py-3 text-sm"><input type="checkbox" checked={useAi} disabled={disabled || preview.isPending} onChange={e => { setUseAi(e.target.checked); preview.reset(); }} />Use the configured AI provider to interpret this text</label>
     <button type="button" disabled={disabled || preview.isPending || !text.trim()} className="border rounded px-3 py-3 disabled:opacity-50" onClick={() => preview.mutate()}>{preview.isPending ? 'Extracting…' : 'Preview invoice lines'}</button>

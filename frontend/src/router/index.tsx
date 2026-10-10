@@ -6,7 +6,8 @@ import { BrandLoading } from '../components/BrandIdentity';
 import { ProtectedRoute, PermissionRoute } from '../auth/Guards';
 import { ToastProvider } from '../components/ui/ToastProvider';
 import { AppShell } from '../layouts/AppShell';
-import Login from '../pages/auth/Login';
+import Login from '../pages/auth/Login';
+import PasswordRecovery from '../pages/auth/PasswordRecovery';
 
 const Dashboard = React.lazy(() => import('../pages/Dashboard'));
 const CatalogList = React.lazy(() => import('../pages/catalog/CatalogList'));
@@ -43,7 +44,9 @@ export const AppRouter = () => {
       <ToastProvider>
         <AuthProvider>
           <RouteErrorBoundary><React.Suspense fallback={<BrandLoading fullScreen />}><Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<PasswordRecovery key="forgot" />} />
+            <Route path="/reset-password" element={<PasswordRecovery key="reset" reset />} />
 
             <Route path="/" element={<ProtectedRoute />}>
               <Route element={<AppShell />}>

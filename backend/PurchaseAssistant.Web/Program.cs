@@ -145,6 +145,12 @@ builder.Services.AddScoped<IAIRoutingService, AIRoutingService>();
 builder.Services.AddScoped<AiRuntimeSettings>();
 builder.Services.AddScoped<WhatsAppDeliveryService>();
 builder.Services.AddScoped<InvoiceTextService>();
+builder.Services.AddScoped<MediaTextService>();
+builder.Services.AddHttpClient("Media", client => { client.Timeout = TimeSpan.FromSeconds(30); client.MaxResponseContentBufferSize = 128_000; })
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false }).RemoveAllLoggers();
+builder.Services.AddScoped<IRecoveryMailSender, RecoveryMailSender>();
+builder.Services.AddScoped<PasswordRecoveryService>();
+if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<RecoveryMailWorker>();
 builder.Services.AddHttpClient("WhatsApp", c => c.Timeout = TimeSpan.FromSeconds(45)).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false }).RemoveAllLoggers();
 builder.Services.AddSingleton<AiCircuitBreaker>();
 

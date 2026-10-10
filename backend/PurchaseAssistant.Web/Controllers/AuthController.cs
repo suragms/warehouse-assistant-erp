@@ -79,6 +79,13 @@ namespace PurchaseAssistant.Web.Controllers
 
             _db.RefreshTokens.Add(rt);
             await _db.SaveChangesAsync();
+            // A concurrent recovery may finish between password verification and session creation.
+            if (!await _db.Users.AsNoTracking().AnyAsync(x => x.Id == user.Id && x.PasswordHash == user.PasswordHash && x.Status == UserStatus.Active))
+            {
+                rt.RevokedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = "Credentials changed. Sign in again." } });
+            }
             var token = _jwtProvider.GenerateAccessToken(user, activeMembership, rt.FamilyId);
 
             SetRefreshTokenCookie($"{user.Id}:{refreshTokenString}:{activeMembership?.BusinessId}");
@@ -381,18 +388,28 @@ namespace PurchaseAssistant.Web.Controllers
 
         [HttpPost("forgot-password")]
         [AllowAnonymous]
-        public IActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, [FromServices] PurchaseAssistant.Web.Services.PasswordRecoveryService recovery, CancellationToken ct)
         {
-            // No token issuer or delivery service exists. Never claim that instructions were sent.
+            Response.Headers.CacheControl = "no-store";
+            if (recovery.Available) {
+                await recovery.RequestAsync(request.Email, ct);
+                return Accepted(new { message = "If an eligible account exists, reset instructions will be queued. Check your inbox; you may request another link if it does not arrive." });
+            }
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = new {
                 code = "PASSWORD_RESET_UNAVAILABLE", message = "Password reset is not configured. Contact your business owner for help." } });
         }
 
         [HttpPost("reset-password")]
         [AllowAnonymous]
-        public IActionResult ResetPassword([FromBody] ResetPasswordRequest request)
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, [FromServices] PurchaseAssistant.Web.Services.PasswordRecoveryService recovery, CancellationToken ct)
         {
-            // Fail closed until signed, expiring, single-use tokens and secure delivery are implemented together.
+            Response.Headers.CacheControl = "no-store";
+            if (recovery.Available) {
+                if (!await recovery.ResetAsync(request.Email, request.Token, request.NewPassword, ct))
+                    return BadRequest(new { error = new { code = "INVALID_RESET_TOKEN", message = "This reset link is invalid or expired. Request a new link." } });
+                Response.Cookies.Delete("refreshToken");
+                return Ok(new { message = "Password changed. Sign in again on each device." });
+            }
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = new {
                 code = "PASSWORD_RESET_UNAVAILABLE", message = "Password reset is not configured. Contact your business owner for help." } });
         }

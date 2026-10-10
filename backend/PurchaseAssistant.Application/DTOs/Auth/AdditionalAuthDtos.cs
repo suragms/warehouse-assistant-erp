@@ -13,19 +13,19 @@ namespace PurchaseAssistant.Application.DTOs.Auth
 
     public class ForgotPasswordRequest
     {
-        [Required, EmailAddress]
+        [Required, EmailAddress, MaxLength(255)]
         public string Email { get; set; } = string.Empty;
     }
 
     public class ResetPasswordRequest
     {
-        [Required, EmailAddress]
+        [Required, EmailAddress, MaxLength(255)]
         public string Email { get; set; } = string.Empty;
 
-        [Required]
+        [Required, MaxLength(256)]
         public string Token { get; set; } = string.Empty;
 
-        [Required]
+        [Required, MaxLength(128)]
         public string NewPassword { get; set; } = string.Empty;
     }
 }

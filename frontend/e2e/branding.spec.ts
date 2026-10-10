@@ -52,7 +52,8 @@ for (const viewport of viewports) {
     await expect(page.getByText('Harisree Agency', { exact: true })).toBeVisible();
     await expect(page.getByText('For sign-in help, contact your business owner.', { exact: true })).toBeVisible();
     await expect(page.locator('a[href="#"]')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /forgot.*password|reset.*password|sign.?up|register/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Forgot password?', exact: true })).toHaveAttribute('href', '/forgot-password');
+    await expect(page.getByRole('link', { name: /sign.?up|register/i })).toHaveCount(0);
     await loadedLogos(page);
     const backgroundUrl = await page.getByTestId('login-background').evaluate(element => {
       const style = getComputedStyle(element);

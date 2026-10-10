@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { InvoiceTextHelper } from './InvoiceTextHelper';
+import { MediaTextInput } from './MediaTextInput';
 import { useMutation } from '@tanstack/react-query';
 import { purchaseIntentApi, type PurchaseIntentCandidateDto, type PurchaseIntentItemCandidateDto } from '../../api/purchaseIntentApi';
 import { isValidQuantity, MAX_PURCHASE_VALUE, purchaseErrorMessage } from '../../lib/purchaseValidation';
@@ -57,6 +58,7 @@ export const PurchaseAssistant = ({ onDraftConfirmed, disabled = false }: Purcha
       <h2 className="text-xl font-bold mb-2">AI Purchase Helper</h2>
       <p className="text-sm text-slate-600 mb-4">Optional: describe your purchase, review the suggestions, then apply them to the form. Nothing is saved until you create the purchase order.</p>
       <InvoiceTextHelper apply={items => onDraftConfirmed(items)} disabled={disabled || parse.isPending} />
+      <MediaTextInput kind="voice" disabled={disabled || parse.isPending} onText={value => { setPrompt(value); setCandidate(null); setError(''); }} />
       <Textarea label="Enter purchase request" value={prompt} maxLength={4000} disabled={parse.isPending || disabled}
         onChange={e => { setPrompt(e.target.value); setCandidate(null); }} placeholder="e.g., Buy 10 units of Rice from Supplier X" />
       <Button type="button" onClick={handleParse} disabled={disabled || !prompt.trim()} className="mt-2" loading={parse.isPending}>

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import apiClient from '../../api/apiClient';
 import { useAuthStore } from '../../stores/authStore';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandIdentity';
 import loginBackgroundUrl from '../../../../brand/getstarted_bg.webp';
@@ -106,6 +106,7 @@ export const Login: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="text-sm">
                   <p className="text-[#475569]">For sign-in help, contact your business owner.</p>
+                  <Link to="/forgot-password" className="inline-block py-2 underline text-[#0E4F46]">Forgot password?</Link>
                 </div>
               </div>
 

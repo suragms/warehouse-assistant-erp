@@ -11,6 +11,7 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
             builder.HasKey(e => e.Id);
             builder.Property(e => e.Name).IsRequired().HasMaxLength(150);
             builder.Property(e => e.Email).IsRequired().HasMaxLength(255);
+            builder.Property(e => e.PasswordHash).IsConcurrencyToken();
 
             // Note: EF Core makes it easy to add unique index
             builder.HasIndex(e => e.Email).IsUnique();
