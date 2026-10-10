@@ -18,6 +18,8 @@ async function fixture(page: Page, role: Role, empty = false) {
     const body = method !== 'GET' && request.postData() ? request.postDataJSON() : undefined;
     let data: unknown = [];
     if (path === '/auth/refresh') data = { data: { accessToken: 'fixture-session', user: { ...personal, businesses: [], currentBusiness: { businessId: 'b1', businessName: 'Harisree Agency', role, permissions: role === 'Staff' ? ['stock.view'] : ['stock.view', 'stock.adjust', 'users.view', 'users.manage', 'reports.view'] } } } };
+    else if (path === "/exports/reports") data = { reports: [{ id: "stock", title: "Current stock", category: "Inventory", period: false, statusFilter: "none", itemRequired: false, formats: ["pdf", "csv", "xlsx"] }], timezone: "UTC", maxRows: 5000, missingCapabilities: [] };
+    else if (path === "/exports/reports/history") data = { items: [] };
     else if (path === "/exports/backup/logs") data = { items: backupLogs };
     else if (path === "/exports/backup/run") { const log = { id: "log2", runType: "manual", status: "success", filePath: "backup_20261002T010000Z_test.json", sizeBytes: 3000, rowCounts: { catalog: 1, purchases: 2 }, durationMs: 25, createdAt: "2026-10-02T01:00:00Z" }; backupLogs = [log, ...backupLogs]; data = log; }
     else if (path === "/exports/restore/dry-run") data = { valid: true, errors: [], rowCounts: { stock: 1 }, writesPerformed: false, restoreEnabled: false };
@@ -62,7 +64,7 @@ for (const role of ['Owner', 'Manager', 'Staff'] as const) for (const [width, he
       else await expect(page.getByText('backup_20261002T000000Z_test.json')).toBeVisible();
       await noOverflow(page); await page.screenshot({ path: info.outputPath('backup.png') });
       const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Stock Excel', exact: true }).click(); expect((await download).suggestedFilename()).toBe('business-test.bin'); await expect(page.getByRole('status')).toContainText('Download started.');
-      await page.getByRole('button', { name: 'Run server backup' }).click(); await expect(page.getByRole('status')).toContainText('Server business backup completed.'); await expect(page.getByText('backup_20261002T010000Z_test.json')).toBeVisible();
+      await page.getByRole('button', { name: 'Save business export' }).click(); await expect(page.getByRole('status')).toContainText('Server business export completed.'); await expect(page.getByText('backup_20261002T010000Z_test.json')).toBeVisible();
       if (role === 'Owner') { await page.getByLabel('Backup JSON', { exact: true }).fill('{"businessId":"b1"}'); await page.getByRole('button', { name: 'Validate backup' }).click(); await expect(page.getByText('Backup structure is valid. No writes performed.')).toBeVisible(); }
       await noOverflow(page);
     }
@@ -78,8 +80,8 @@ test('backup loading, recoverable history errors and failed runs stay distinct',
   await page.goto('/settings/backup'); await expect(page.getByText('Loading backup history…')).toBeVisible(); release(); await expect(page.getByText('No server backups recorded yet.')).toBeVisible();
   await page.unroute('**/exports/backup/logs'); controls.failReads(true); await page.reload(); await expect(page.getByRole('button', { name: 'Retry history' })).toBeVisible();
   controls.failReads(false); await page.getByRole('button', { name: 'Retry history' }).click(); await expect(page.getByText('backup_20261002T000000Z_test.json')).toBeVisible();
-  controls.failWrites(true); await page.getByRole('button', { name: 'Run server backup' }).click(); await expect(page.getByRole('alert')).toContainText('Server backup could not be completed. Try again.');
-  controls.failWrites(false); await page.getByRole('button', { name: 'Run server backup' }).click(); await expect(page.getByRole('status')).toContainText('Server business backup completed.'); await noOverflow(page);
+  controls.failWrites(true); await page.getByRole('button', { name: 'Save business export' }).click(); await expect(page.getByRole('alert').filter({ hasText: 'Server export could not be completed. Try again.' })).toBeVisible();
+  controls.failWrites(false); await page.getByRole('button', { name: 'Save business export' }).click(); await expect(page.getByRole('status')).toContainText('Server business export completed.'); await noOverflow(page);
 });
 test('automatic daily JSON is deduplicated across reloads and can be disabled', async ({ page }) => {
   const { calls } = await fixture(page, 'Owner'); await page.goto('/settings/backup'); const first = page.waitForEvent('download');

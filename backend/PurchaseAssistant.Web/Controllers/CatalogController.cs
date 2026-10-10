@@ -38,16 +38,20 @@ namespace PurchaseAssistant.Web.Controllers
             return Ok(new ApiResponse<List<DuplicateCandidateDto>>(duplicates));
         }
 
+        [HttpGet("by-barcode")]
+        [Authorize(Policy = "RequireCatalogView")]
+        public Task<ActionResult<CatalogItemDto>> GetByBarcodeQuery([FromQuery] string barcode) => GetByBarcode(barcode);
+
         [HttpGet("by-barcode/{barcode}")]
         [Authorize(Policy = "RequireCatalogView")]
         public async Task<ActionResult<CatalogItemDto>> GetByBarcode(string barcode)
         {
-            var item = await _catalogService.GetByBarcodeAsync(barcode);
-            if (item == null)
+            try
             {
-                return NotFound(new { error = "BARCODE_NOT_FOUND" });
+                var item = await _catalogService.GetByBarcodeAsync(barcode);
+                return item == null ? NotFound(new { error = "BARCODE_NOT_FOUND" }) : Ok(item);
             }
-            return Ok(item);
+            catch (ArgumentException ex) { return BadRequest(new { error = "INVALID_BARCODE", message = ex.Message }); }
         }
 
         [HttpGet("{id}")]
@@ -67,10 +71,11 @@ namespace PurchaseAssistant.Web.Controllers
                 var result = await _catalogService.CreateAsync(dto, cancellationToken);
                 return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
             }
-            catch (InvalidOperationException ex) when (ex.Message == "DUPLICATE_ITEM_CODE_OR_BARCODE")
+            catch (InvalidOperationException ex) when (ex.Message is "DUPLICATE_ITEM_CODE_OR_BARCODE" or "DUPLICATE_BARCODE")
             {
-                return Conflict(new { error = "DUPLICATE_ITEM_CODE_OR_BARCODE" });
+                return Conflict(new { error = ex.Message });
             }
+            catch (ArgumentException ex) { return BadRequest(new { error = "INVALID_CATALOG_INPUT", message = ex.Message }); }
         }
 
         [HttpPut("{id}")]
@@ -89,10 +94,31 @@ namespace PurchaseAssistant.Web.Controllers
             {
                 return Conflict(new { error = "CATALOG_ITEM_VERSION_CONFLICT" });
             }
-            catch (InvalidOperationException ex) when (ex.Message == "DUPLICATE_ITEM_CODE_OR_BARCODE")
+            catch (InvalidOperationException ex) when (ex.Message is "DUPLICATE_ITEM_CODE_OR_BARCODE" or "DUPLICATE_BARCODE")
             {
-                return Conflict(new { error = "DUPLICATE_ITEM_CODE_OR_BARCODE" });
+                return Conflict(new { error = ex.Message });
             }
+            catch (ArgumentException ex) { return BadRequest(new { error = "INVALID_CATALOG_INPUT", message = ex.Message }); }
+        }
+
+        [HttpPatch("{id}/barcode")]
+        [Authorize(Policy = "RequireCatalogEdit")]
+        public async Task<ActionResult<CatalogItemDto>> AssignBarcode(Guid id, BarcodeAssignmentDto dto, CancellationToken cancellationToken = default)
+            => await BarcodeMutation(() => _catalogService.AssignBarcodeAsync(id, dto, cancellationToken));
+
+        [HttpPost("{id}/barcode/generate")]
+        [Authorize(Policy = "RequireCatalogEdit")]
+        public async Task<ActionResult<CatalogItemDto>> GenerateBarcode(Guid id, GenerateBarcodeDto dto, CancellationToken cancellationToken = default)
+            => await BarcodeMutation(() => _catalogService.GenerateBarcodeAsync(id, dto.ExpectedVersion, cancellationToken));
+
+        private async Task<ActionResult<CatalogItemDto>> BarcodeMutation(Func<Task<CatalogItemDto>> operation)
+        {
+            try { return Ok(await operation()); }
+            catch (KeyNotFoundException) { return NotFound(new { error = "CATALOG_ITEM_NOT_FOUND" }); }
+            catch (ArgumentException ex) { return BadRequest(new { error = "INVALID_BARCODE", message = ex.Message }); }
+            catch (InvalidOperationException ex) when (ex.Message is "DUPLICATE_BARCODE" or "CATALOG_ITEM_VERSION_CONFLICT"
+                or "CATALOG_ITEM_BARCODE_EXISTS" or "CATALOG_ITEM_INACTIVE")
+            { return Conflict(new { error = ex.Message }); }
         }
 
         [HttpDelete("{id}")]

@@ -112,6 +112,9 @@ builder.Services.AddSingleton(new PurchaseAssistant.ML.ArtifactStore(builder.Con
 builder.Services.AddScoped<MlService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<BusinessBackupService>();
+builder.Services.AddScoped<PurchaseAssistant.Infrastructure.Services.Backups.IDatabaseBackupEngine>(sp => new PurchaseAssistant.Infrastructure.Services.Backups.PostgresBackupEngine(
+    sp.GetRequiredService<IConfiguration>(), builder.Environment.ContentRootPath, sp.GetRequiredService<AppDbContext>()));
+builder.Services.AddScoped<PurchaseAssistant.Infrastructure.Services.Backups.DatabaseBackupService>();
 builder.Services.AddScoped<IAIUsageRecorder, AiUsageRecorder>();
 if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<BusinessBackupWorker>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -196,6 +199,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddAuthorization(options =>
 {
+    foreach (var (policyName, configurationKey) in new[] { ("RequireDatabaseBackup", "Backup:OperatorUserIds"), ("RequireDatabaseRecovery", "Backup:RecoveryOperatorUserIds") })
+        options.AddPolicy(policyName, policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").RequireRole("SuperAdmin").RequireAssertion(context =>
+        {
+            var id = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(id, out var userId) && (builder.Configuration.GetSection(configurationKey).Get<string[]>() ?? [])
+                .Any(value => Guid.TryParse(value, out var allowed) && allowed == userId);
+        }));
     options.AddPolicy("RequireSelectedBusiness", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId"));
     // Define commonly used policies safely
     options.AddPolicy("RequireUsersView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").RequireRole("Owner", "Admin", "Manager", "SuperAdmin").AddRequirements(new PermissionRequirement(Permissions.UsersView)));

@@ -4,6 +4,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save } from 'lucide-react';
 import { catalogApi, type CatalogItem } from '../../api/catalogApi';
+import { barcodeValidation, invalidateBarcodeQueries, barcodeError } from '../../lib/barcodes';
 import { catalogKeys, categoryKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Input, Select, Card, Skeleton, ConfirmDialog, ErrorState } from '../../components/ui';
 import { useToast } from '../../components/ui/toastContext';
@@ -23,13 +24,14 @@ interface ItemFormValues {
   rowVersion: string;
 }
 
-function validateForm(data: ItemFormValues): Record<string, string> {
+function validateForm(data: ItemFormValues, existingBarcode?: string | null): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!data.name.trim()) errors.name = 'Name is required';
   else if (data.name.length > 200) errors.name = 'Name must be 200 characters or less';
   if (!data.itemCode.trim()) errors.itemCode = 'Item Code is required';
   else if (data.itemCode.length > 50) errors.itemCode = 'Item Code must be 50 characters or less';
-  if (data.barcode && data.barcode.length > 100) errors.barcode = 'Barcode must be 100 characters or less';
+  const barcodeIssue = data.barcode === existingBarcode ? undefined : barcodeValidation(data.barcode);
+  if (barcodeIssue) errors.barcode = barcodeIssue;
   if (!data.categoryId) errors.categoryId = 'Category is required';
   if (!data.defaultUnit) errors.defaultUnit = 'Unit is required';
   if (data.kgPerUnit && (isNaN(parseFloat(data.kgPerUnit)) || parseFloat(data.kgPerUnit) <= 0))
@@ -125,7 +127,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
       const payload: Partial<CatalogItem> = {
         name: data.name.trim(),
         itemCode: data.itemCode.trim(),
-        barcode: data.barcode.trim() || undefined,
+        barcode: data.barcode.trim() || null,
         categoryId: data.categoryId,
         typeId: data.typeId || undefined,
         defaultUnit: data.defaultUnit,
@@ -140,16 +142,18 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
       return catalogApi.createItem(payload);
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
+      void invalidateBarcodeQueries(queryClient);
       if (edit) queryClient.invalidateQueries({ queryKey: catalogKeys.detail(id!) });
       queryClient.invalidateQueries({ queryKey: ['search'] });
 
       showToast(edit ? 'Item updated successfully' : 'Item created successfully', 'success');
       navigate(edit ? `/catalog/items/${id}` : `/catalog/items/${res.id}`);
     },
-    onError: (err: { normalized?: string | { message?: string } }) => {
+    onError: (err: { normalized?: string | { message?: string }; response?: { data?: { error?: string } } }) => {
       const msg = typeof err.normalized === 'string' ? err.normalized : err.normalized?.message;
-      if (msg === 'DUPLICATE_ITEM_CODE_OR_BARCODE') {
+      if (err.response?.data?.error === 'DUPLICATE_BARCODE') {
+        setError('barcode', { type: 'manual', message: barcodeError(err) });
+      } else if (msg === 'DUPLICATE_ITEM_CODE_OR_BARCODE') {
         setError('itemCode', { type: 'manual', message: 'Item code or barcode already exists.' });
         setError('barcode', { type: 'manual', message: 'If barcode is provided, it might be a duplicate.' });
         showToast('Duplicate identifier detected. Please check item code and barcode.', 'error');
@@ -162,8 +166,9 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   });
 
   const onSubmit = (data: ItemFormValues) => {
+    if (mutation.isPending) return;
     // Client-side validation (no zodResolver needed — types are all strings)
-    const validationErrors = validateForm(data);
+    const validationErrors = validateForm(data, edit ? item?.barcode : undefined);
     if (Object.keys(validationErrors).length > 0) {
       Object.entries(validationErrors).forEach(([field, message]) => {
         setError(field as keyof ItemFormValues, { type: 'manual', message });
@@ -223,7 +228,8 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
 
             <Input
               label="Barcode"
-              placeholder="EAN / UPC (Optional)"
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
+              placeholder="Code 128 compatible value (Optional)"
               error={errors.barcode?.message}
               {...register('barcode')}
             />
@@ -295,9 +301,9 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
 
         <div className="flex justify-end gap-3 sticky bottom-4 bg-[#F7F9F6] p-4 rounded-xl border border-[#E2E8E6] shadow-sm">
           <Link to={edit ? `/catalog/items/${id}` : "/catalog/items"}>
-            <Button type="button" variant="ghost" disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" variant="ghost" disabled={isSubmitting || mutation.isPending}>Cancel</Button>
           </Link>
-          <Button type="submit" icon={<Save className="h-4 w-4" />} loading={isSubmitting}>
+          <Button type="submit" icon={<Save className="h-4 w-4" />} loading={isSubmitting || mutation.isPending}>
             {edit ? 'Save Changes' : 'Create Item'}
           </Button>
         </div>
@@ -306,7 +312,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
       <ConfirmDialog
         open={conflictDialogOpen}
         title="Version Conflict"
-        description="This item was modified by another user while you were editing. Saving now will overwrite their changes. Do you want to reload the latest version?"
+        description="This item was modified by another user while you were editing. Reload the latest version before saving your changes."
         confirmLabel="Reload Latest"
         cancelLabel="Cancel"
         variant="primary"

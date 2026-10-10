@@ -34,10 +34,12 @@ $serverLog = Join-Path $clusterRoot 'postgres.log'
 $adminPassword = [Guid]::NewGuid().ToString('N')
 $runnerPassword = [Guid]::NewGuid().ToString('N')
 $databaseName = "wa_test_$runId"
+$restoreDatabaseName = "wa_test_restore_$runId"
 $portListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $environmentNames = @(
     'PGPASSWORD',
     'PURCHASE_ASSISTANT_TEST_DATABASE',
+    'PURCHASE_ASSISTANT_RESTORE_TEST_DATABASE',
     'ConnectionStrings__DefaultConnection',
     'Jwt__SecretKey',
     'ASPNETCORE_ENVIRONMENT',
@@ -50,6 +52,7 @@ foreach ($name in $environmentNames) {
     $priorEnvironment[$name] = [System.Environment]::GetEnvironmentVariable($name, 'Process')
 }
 $serverStarted = $false
+$clusterStopped = $true
 $exitCode = 0
 
 function Invoke-CheckedNative([string]$FilePath, [string[]]$Arguments, [string]$Operation) {
@@ -79,18 +82,24 @@ try {
     # pipe keeping PowerShell redirection open until the server shuts down.
     $startupOutput = Join-Path $clusterRoot 'startup.log'
     $startupError = Join-Path $clusterRoot 'startup-error.log'
+    # A launch can succeed even if process-exit inspection fails. Always attempt shutdown before cleanup.
+    $serverStarted = $true
+    $clusterStopped = $false
     $startup = Start-Process -FilePath $resolvedTools['pg_ctl'] -ArgumentList @(
         '--pgdata', "`"$dataDirectory`"",
         '--options', "`"-h 127.0.0.1 -p $port -c listen_addresses=127.0.0.1`"",
         '--log', "`"$serverLog`"", '--wait', 'start'
     ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $startupOutput -RedirectStandardError $startupError
+    # Cache the handle before waiting: Windows PowerShell 5 can otherwise return a null ExitCode.
+    [void]$startup.Handle
     $startup.WaitForExit()
     if ($startup.ExitCode -ne 0) { throw "PostgreSQL startup failed with exit code $($startup.ExitCode)." }
     Get-Content -LiteralPath $startupOutput
     $serverStarted = $true
 
     $sql = "CREATE ROLE wa_test_runner LOGIN PASSWORD '$runnerPassword';" + [System.Environment]::NewLine +
-        "CREATE DATABASE $databaseName OWNER wa_test_runner;" + [System.Environment]::NewLine
+        "CREATE DATABASE $databaseName OWNER wa_test_runner;" + [System.Environment]::NewLine +
+        "CREATE DATABASE $restoreDatabaseName OWNER wa_test_runner;" + [System.Environment]::NewLine
     [System.IO.File]::WriteAllText($bootstrapSqlFile, $sql, [System.Text.Encoding]::ASCII)
     $env:PGPASSWORD = $adminPassword
     Invoke-CheckedNative $resolvedTools['psql'] @(
@@ -105,6 +114,7 @@ try {
     $env:Jwt__SecretKey = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
     $env:ConnectionStrings__DefaultConnection = $connection
     $env:PURCHASE_ASSISTANT_TEST_DATABASE = $connection
+    $env:PURCHASE_ASSISTANT_RESTORE_TEST_DATABASE = "Host=127.0.0.1;Port=$port;Database=$restoreDatabaseName;Username=wa_test_runner;Password=$runnerPassword;Timeout=10;Command Timeout=120"
     $env:Logging__LogLevel__Default = 'Warning'
     $env:Logging__LogLevel__Microsoft = 'Warning'
     Set-Item 'Env:Logging__LogLevel__Microsoft.EntityFrameworkCore' 'Warning'
@@ -117,6 +127,7 @@ try {
             '--startup-project', 'backend/PurchaseAssistant.Web/PurchaseAssistant.Web.csproj',
             '--configuration', 'Release'
         ) 'Target schema migration on the disposable test database'
+        Invoke-CheckedNative 'dotnet' @('build', 'backend/PurchaseAssistant.RecoveryTool/PurchaseAssistant.RecoveryTool.csproj', '--configuration', 'Release') 'Recovery tool build'
         Invoke-CheckedNative 'dotnet' @(
             'test', 'backend/PurchaseAssistant.IntegrationTests/PurchaseAssistant.IntegrationTests.csproj',
             '--configuration', 'Release',
@@ -141,12 +152,13 @@ finally {
     if ($serverStarted) {
         & $resolvedTools['pg_ctl'] '--pgdata' $dataDirectory '--wait' '--mode' 'fast' 'stop'
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning 'Could not stop the disposable PostgreSQL cluster cleanly.'
+            Write-Warning 'Could not stop the disposable PostgreSQL cluster cleanly; preserving its files.'
             $exitCode = 1
         }
+        else { $clusterStopped = $true }
     }
 
-    if (-not $KeepCluster -and (Test-Path -LiteralPath $clusterRoot)) {
+    if (-not $KeepCluster -and $clusterStopped -and (Test-Path -LiteralPath $clusterRoot)) {
         $resolvedClusterRoot = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $clusterRoot).Path)
         if ($resolvedClusterRoot.StartsWith($safePrefix, [System.StringComparison]::OrdinalIgnoreCase) -and
             [System.IO.Path]::GetFileName($resolvedClusterRoot) -match '^wa-phase2-pg-[a-f0-9]{32}$') {
@@ -157,10 +169,10 @@ finally {
             $exitCode = 1
         }
     }
-    elseif ($KeepCluster -and (Test-Path -LiteralPath $clusterRoot)) {
+    elseif ((Test-Path -LiteralPath $clusterRoot)) {
         Write-Output "Disposable PostgreSQL cluster retained at $clusterRoot"
     }
-    $portListener.Dispose()
+    $portListener.Stop()
 }
 
 exit $exitCode

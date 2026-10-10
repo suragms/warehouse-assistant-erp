@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Barcode, CheckCircle } from 'lucide-react';
 import { catalogApi, type CatalogItem } from '../../api/catalogApi';
 import { barcodeKeys, catalogKeys } from '../../lib/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
-import { useToast } from '../../components/ui/toastContext';
+import BarcodeAssignment from '../../components/BarcodeAssignment';
 import { PageHeader, Card, Button, Input, Badge, Skeleton, ErrorState } from '../../components/ui';
 import { BarcodeCamera, BarcodeLabel } from '../../components/BarcodeTools';
 import { hasPermission } from '../../auth/hasPermission';
 
 export default function BarcodeManager() {
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
   const { user } = useAuthStore();
 
   const hasEditPermission = hasPermission(user, 'catalog.edit');
@@ -37,63 +35,30 @@ export default function BarcodeManager() {
     inputRef.current?.focus();
   };
 
-  const handleSearchClick = () => {
-    if (inputValue.trim()) {
-      setSearchQuery(inputValue.trim());
-    }
+  const handleLookup = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized || isFetching) return;
+    if (normalized === searchQuery) void refetch();
+    else setSearchQuery(normalized);
   };
+  const handleSearchClick = () => handleLookup(inputValue);
 
   // -- Assign State --
   const [assignSearch, setAssignSearch] = useState('');
   const [debouncedAssignSearch, setDebouncedAssignSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [assignBarcodeValue, setAssignBarcodeValue] = useState('');
-  const [assignError, setAssignError] = useState('');
-  const [isAssigning, setIsAssigning] = useState(false);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedAssignSearch(assignSearch), 300);
     return () => clearTimeout(handler);
   }, [assignSearch]);
 
-  const { data: assignCandidates, isLoading: isLoadingCandidates } = useQuery({
+  const { data: assignCandidates, isLoading: isLoadingCandidates, error: candidatesError, refetch: retryCandidates } = useQuery({
     queryKey: catalogKeys.list({ page: 1, pageSize: 10, search: debouncedAssignSearch }),
     queryFn: () => catalogApi.getItems(1, 10, debouncedAssignSearch),
     enabled: !!debouncedAssignSearch && !selectedItem,
   });
 
-  const handleAssign = async () => {
-    if (!selectedItem || !assignBarcodeValue.trim()) return;
-    setAssignError('');
-    setIsAssigning(true);
-
-    try {
-      await catalogApi.updateItem(selectedItem.id, {
-        ...selectedItem,
-        barcode: assignBarcodeValue.trim(),
-      });
-      showToast('Barcode assigned successfully', 'success');
-
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: barcodeKeys.lookup(assignBarcodeValue.trim()) });
-      queryClient.invalidateQueries({ queryKey: catalogKeys.detail(selectedItem.id) });
-      queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
-
-      // Reset
-      setSelectedItem(null);
-      setAssignSearch('');
-      setAssignBarcodeValue('');
-    } catch (err: unknown) {
-      const errorObj = err as { response?: { status?: number }; message?: string };
-      if (errorObj.response?.status === 409) {
-        setAssignError('This barcode is already assigned to another item');
-      } else {
-        setAssignError(errorObj.message || 'Failed to assign barcode');
-      }
-    } finally {
-      setIsAssigning(false);
-    }
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -105,7 +70,7 @@ export default function BarcodeManager() {
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Lookup Barcode</h2>
             <div className="flex gap-3 items-end">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <Input
                   ref={inputRef}
                   label="Scan or enter barcode"
@@ -114,22 +79,23 @@ export default function BarcodeManager() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
+                      e.stopPropagation();
                       handleSearchClick();
                     }
                   }}
                   placeholder="e.g. 123456789012"
-                  autoFocus maxLength={128}
+                  autoFocus maxLength={100}
                 />
               </div>
               <Button
                 onClick={handleSearchClick}
                 icon={<Search className="h-4 w-4" />}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isFetching}
               >
                 Search
               </Button>
             </div>
-            <BarcodeCamera onDetected={value => { setInputValue(value); setSearchQuery(value); }} />
+            <BarcodeCamera onDetected={value => { setInputValue(value); handleLookup(value); }} />
           </Card>
 
           {/* Results */}
@@ -165,7 +131,7 @@ export default function BarcodeManager() {
                         {data.name}
                         <CheckCircle className="h-5 w-5 text-emerald-500" />
                       </h3>
-                      <p className="text-sm text-gray-600 font-mono mt-1">Barcode: {data.barcode}</p>
+                      <p className="text-sm text-gray-600 font-mono mt-1 break-all">Barcode: {data.barcode}</p>
                     </div>
                     {data.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="red">Archived</Badge>}
                   </div>
@@ -185,6 +151,9 @@ export default function BarcodeManager() {
                     </div>
                   </div>
 
+                  {!data.isActive && <p role="alert">This item is archived. Scanning has not changed stock.</p>}
+                  <p>Current stock: {data.currentStock ?? 'Unavailable'} {data.defaultUnit}</p>
+                  <p>Unit: {data.defaultUnit || 'Unavailable'}</p>
                   {data.barcode && <BarcodeLabel key={data.barcode} value={data.barcode} name={data.name} />}
                   <div className="pt-4 mt-2 border-t border-[#E2E8E6] flex justify-end">
                     <Link to={`/catalog/items/${data.id}`}>
@@ -194,7 +163,7 @@ export default function BarcodeManager() {
                 </Card>
               ) : error ? (
                 <Card className="p-6">
-                  <ErrorState message="Failed to lookup barcode. Please try again." onRetry={() => refetch()} />
+                  <ErrorState message={(error as { response?: { data?: { error?: string; message?: string } } }).response?.data?.error === 'INVALID_BARCODE' ? 'Invalid barcode. Use at most 100 characters without control characters.' : "Failed to lookup barcode. Please try again."} onRetry={() => refetch()} />
                 </Card>
               ) : null}
             </div>
@@ -222,24 +191,25 @@ export default function BarcodeManager() {
                     <div className="absolute top-full left-0 right-0 z-10 bg-white border border-[#E2E8E6] rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
                       {isLoadingCandidates ? (
                         <div className="p-3 text-sm text-gray-500">Loading...</div>
+                      ) : candidatesError ? (
+                        <ErrorState message="Could not load items." onRetry={() => retryCandidates()} />
                       ) : assignCandidates?.data.length === 0 ? (
                         <div className="p-3 text-sm text-gray-500">No items found</div>
                       ) : (
                         <ul className="py-1">
                           {assignCandidates?.data.map(item => (
-                            <li
-                              key={item.id}
+                            <li key={item.id}><button type="button"
                               onClick={() => {
                                 setSelectedItem(item);
                                 setAssignSearch('');
                               }}
-                              className="px-3 py-2 hover:bg-gray-50 cursor-pointer flex flex-col"
+                              className="w-full text-left px-3 py-2 hover:bg-gray-50 cursor-pointer flex flex-col"
                             >
                               <span className="font-medium text-sm text-[#0F172A] truncate">{item.name}</span>
                               <span className="text-xs text-gray-500">
                                 Code: {item.itemCode} | Barcode: {item.barcode || 'None'}
                               </span>
-                            </li>
+                            </button></li>
                           ))}
                         </ul>
                       )}
@@ -247,23 +217,8 @@ export default function BarcodeManager() {
                   )}
                 </div>
 
-                <Input
-                  label="New Barcode"
-                  value={assignBarcodeValue}
-                  onChange={(e) => setAssignBarcodeValue(e.target.value)}
-                  placeholder="Scan or enter new barcode"
-                  error={assignError}
-                />
-
-                <div className="pt-2 flex justify-end">
-                  <Button
-                    onClick={handleAssign}
-                    loading={isAssigning}
-                    disabled={!selectedItem || !assignBarcodeValue.trim()}
-                  >
-                    Assign
-                  </Button>
-                </div>
+                {selectedItem ? <BarcodeAssignment key={selectedItem.id} item={selectedItem} onChanged={setSelectedItem} />
+                  : <p className="text-sm">Choose an existing item to assign or generate a barcode.</p>}
               </div>
             </Card>
           </div>

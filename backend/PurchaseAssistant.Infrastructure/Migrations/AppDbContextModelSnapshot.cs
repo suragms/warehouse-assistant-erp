@@ -654,6 +654,169 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.ToTable("DailyUsageLogs");
                 });
 
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.DatabaseBackupEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("DatabaseBackupEvents");
+                });
+
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.DatabaseBackupJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("OffsiteVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Pinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("RetryAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScheduleKey")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)");
+
+                    b.Property<string>("Sha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduleKey")
+                        .IsUnique()
+                        .HasFilter("\"ScheduleKey\" IS NOT NULL");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("DatabaseBackupJobs");
+                });
+
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.DatabaseBackupSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("DailyEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("DailyHour")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DailyMinute")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DailyRetention")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ManualRetention")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MonthlyDay")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("MonthlyEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MonthlyHour")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MonthlyMinute")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MonthlyRetention")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DatabaseBackupSettings", t =>
+                        {
+                            t.HasCheckConstraint("CK_DatabaseBackupSettings_Valid", "\"Id\" = 1 AND \"DailyHour\" BETWEEN 0 AND 23 AND \"DailyMinute\" BETWEEN 0 AND 59 AND \"MonthlyDay\" BETWEEN 1 AND 31 AND \"MonthlyHour\" BETWEEN 0 AND 23 AND \"MonthlyMinute\" BETWEEN 0 AND 59 AND \"DailyRetention\" BETWEEN 1 AND 365 AND \"MonthlyRetention\" BETWEEN 1 AND 120 AND \"ManualRetention\" BETWEEN 1 AND 365");
+                        });
+                });
+
             modelBuilder.Entity("PurchaseAssistant.Domain.Entities.HistoricalUsageBatch", b =>
                 {
                     b.Property<Guid>("Id")

@@ -39,6 +39,9 @@ public partial class PurchaseIntentEndpointTests
         public Mock<IGlobalSearchService> Search { get; } = new();
         public Mock<IReportService> Reports { get; } = new();
         public bool RealCsvReports { get; set; }
+        public bool DatabaseOperator { get; set; }
+        public bool RecoveryOperator { get; set; }
+        public PurchaseAssistant.Infrastructure.Services.Backups.IDatabaseBackupEngine? DatabaseBackupEngine { get; set; }
         public bool RealDashboard { get; set; }
         public Mock<IDashboardService> Dashboard { get; } = new();
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -46,8 +49,12 @@ public partial class PurchaseIntentEndpointTests
             builder.UseEnvironment("Testing");
             builder.UseSetting("Jwt:SecretKey", Key);
             builder.UseSetting("BACKUP_DIR", BackupDirectory);
+            builder.UseSetting("Backup:LockNamespace", BackupDirectory);
+            if (DatabaseOperator) builder.UseSetting("Backup:OperatorUserIds:0", UserId.ToString());
+            if (RecoveryOperator) builder.UseSetting("Backup:RecoveryOperatorUserIds:0", UserId.ToString());
             builder.UseSetting("ML:ArtifactPath", Path.Combine(BackupDirectory, "models"));
             builder.ConfigureServices(services => {
+                if (DatabaseBackupEngine != null) { services.RemoveAll<PurchaseAssistant.Infrastructure.Services.Backups.IDatabaseBackupEngine>(); services.AddSingleton(DatabaseBackupEngine); }
                 services.RemoveAll<IPurchaseParsingService>(); services.AddSingleton(Parser.Object);
                 services.RemoveAll<IPurchaseService>(); services.AddSingleton(Purchases.Object);
                 services.RemoveAll<IGlobalSearchService>(); services.AddSingleton(Search.Object);

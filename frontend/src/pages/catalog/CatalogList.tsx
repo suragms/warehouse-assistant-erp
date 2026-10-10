@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { PermissionGate } from '../../auth/Guards';
 import { Plus, Search } from 'lucide-react';
+import { canPrintBarcode } from '../../lib/barcodes';
+import { BarcodeLabels } from '../../components/BarcodeTools';
 import { catalogApi } from '../../api/catalogApi';
 import { catalogKeys, categoryKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Skeleton, ErrorState, Badge, Pagination } from '../../components/ui';
 
 export default function CatalogList() {
+  const [selected, setSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -30,9 +34,12 @@ export default function CatalogList() {
         title="Catalog Items"
         subtitle="Manage master product records"
         actions={
-          <Link to="/catalog/items/new">
-            <Button icon={<Plus className="h-4 w-4" />}>New Item</Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/catalog/barcodes"><Button variant="secondary">Barcode Manager</Button></Link>
+            <PermissionGate permission="catalog.create"><Link to="/catalog/items/new">
+              <Button icon={<Plus className="h-4 w-4" />}>New Item</Button>
+            </Link></PermissionGate>
+          </div>
         }
       />
 
@@ -44,14 +51,14 @@ export default function CatalogList() {
             type="text"
             placeholder="Search name, code, barcode..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSelected([]); setSearch(e.target.value); setPage(1); }}
             className="w-full pl-9 pr-3 py-2 border border-[#E2E8E6] rounded-lg text-sm outline-none focus:border-[#159A8A]"
           />
         </div>
         <div className="w-full sm:w-auto">
           <select
             value={categoryId}
-            onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
+            onChange={(e) => { setSelected([]); setCategoryId(e.target.value); setPage(1); }}
             className="w-full px-3 py-2 border border-[#E2E8E6] rounded-lg text-sm bg-white outline-none focus:border-[#159A8A]"
           >
             <option value="">All Categories</option>
@@ -62,6 +69,10 @@ export default function CatalogList() {
         </div>
       </div>
 
+      <div className="mb-4">
+        <BarcodeLabels items={(data?.data || []).filter(item => selected.includes(item.id))} />
+        <p className="text-sm">Select printable labels on this page. Archived items are excluded.</p>
+      </div>
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E2E8E6] flex-1 overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
@@ -81,6 +92,7 @@ export default function CatalogList() {
             <table className="min-w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-gray-50 text-[#475569] font-medium sticky top-0 z-10 border-b border-[#E2E8E6]">
                 <tr>
+                  <th className="px-4 py-3">Label</th>
                   <th className="px-4 py-3">Item Name</th>
                   <th className="px-4 py-3">Item Code</th>
                   <th className="px-4 py-3">Barcode</th>
@@ -93,6 +105,9 @@ export default function CatalogList() {
               <tbody className="divide-y divide-[#E2E8E6]">
                 {data?.data.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3"><input type="checkbox" aria-label={`Print label for ${item.name}`}
+                      disabled={!item.isActive || !item.barcode || !canPrintBarcode(item.barcode)}
+                      checked={selected.includes(item.id)} onChange={e => setSelected(values => e.target.checked ? [...values, item.id] : values.filter(id => id !== item.id))} /></td>
                     <td className="px-4 py-3 font-medium text-[#0F172A] max-w-[200px] truncate" title={item.name}>
                       <Link to={`/catalog/items/${item.id}`} className="hover:text-[#159A8A]">
                         {item.name}
@@ -134,7 +149,7 @@ export default function CatalogList() {
               pageSize={data.meta.pageSize}
               totalCount={data.meta.totalCount}
               totalPages={data.meta.totalPages}
-              onPageChange={setPage}
+              onPageChange={value => { setSelected([]); setPage(value); }}
             />
           </div>
         )}

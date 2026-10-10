@@ -3,7 +3,7 @@ import apiClient from './apiClient';
 export interface CatalogItem {
   id: string;
   itemCode: string;
-  barcode?: string;
+  barcode?: string | null;
   name: string;
   categoryId: string;
   categoryName: string;
@@ -138,7 +138,7 @@ export const catalogApi = {
   },
 
   lookupByBarcode: async (barcode: string): Promise<CatalogItem> => {
-    const res = await apiClient.get(`/catalog/items/by-barcode/${encodeURIComponent(barcode)}`);
+    const res = await apiClient.get(`/catalog/items/by-barcode?${new URLSearchParams({ barcode }).toString()}`);
     return res.data;
   },
 
@@ -149,6 +149,15 @@ export const catalogApi = {
 
   updateItem: async (id: string, item: Partial<CatalogItem>): Promise<CatalogItem> => {
     const res = await apiClient.put(`/catalog/items/${id}`, item);
+    return res.data;
+  },
+
+  assignBarcode: async (id: string, barcode: string | null, expectedVersion: string): Promise<CatalogItem> => {
+    const res = await apiClient.patch(`/catalog/items/${id}/barcode`, { barcode, expectedVersion });
+    return res.data;
+  },
+  generateBarcode: async (id: string, expectedVersion: string): Promise<CatalogItem> => {
+    const res = await apiClient.post(`/catalog/items/${id}/barcode/generate`, { expectedVersion });
     return res.data;
   },
 

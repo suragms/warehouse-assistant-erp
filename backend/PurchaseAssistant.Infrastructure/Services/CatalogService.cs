@@ -28,7 +28,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var normalizedSearch = search.Trim().ToLowerInvariant();
-                query = query.Where(i => i.Name.ToLower().Contains(normalizedSearch) || i.ItemCode.ToLower().Contains(normalizedSearch));
+                query = query.Where(i => i.Name.ToLower().Contains(normalizedSearch) || i.ItemCode.ToLower().Contains(normalizedSearch) || (i.Barcode != null && i.Barcode.Contains(search.Trim())));
             }
 
             if (categoryId.HasValue)
@@ -110,11 +110,13 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<CatalogItemDto?> GetByBarcodeAsync(string barcode)
         {
-            var normalized = barcode.Trim().ToLowerInvariant();
-            var item = await _context.CatalogItems
+            var businessId = RequireBusiness();
+            var normalized = ValidateBarcode(barcode, allowLegacyUnicode: true)
+                ?? throw new ArgumentException("Enter a barcode.");
+            var item = await _context.CatalogItems.AsNoTracking()
                 .Include(i => i.Category)
                 .Include(i => i.Type)
-                .FirstOrDefaultAsync(i => i.Barcode != null && i.Barcode.ToLower() == normalized);
+                .FirstOrDefaultAsync(i => i.BusinessId == businessId && i.Barcode == normalized);
 
             if (item == null) return null;
 
@@ -139,12 +141,14 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<CatalogItemDto> CreateAsync(CatalogItemDto dto, CancellationToken cancellationToken = default)
         {
+            var barcode = ValidateBarcode(dto.Barcode);
+            await ValidateBarcodeAvailableAsync(barcode, null, cancellationToken);
             await ValidateReferencesAsync(dto, cancellationToken);
             var item = new CatalogItem
             {
                 BusinessId = _currentUser.BusinessId ?? throw new InvalidOperationException("BUSINESS_CONTEXT_REQUIRED"),
                 ItemCode = _normalization.NormalizeItemCode(dto.ItemCode),
-                Barcode = _normalization.NormalizeBarcode(dto.Barcode),
+                Barcode = barcode,
                 Name = dto.Name.Trim(),
                 CategoryId = dto.CategoryId,
                 TypeId = dto.TypeId,
@@ -160,13 +164,12 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 await _context.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsCatalogIdentifierConflict(ex))
             {
-                // This might be due to unique constraint on ItemCode or Barcode
-                throw new InvalidOperationException("DUPLICATE_ITEM_CODE_OR_BARCODE");
+                throw IdentifierConflict(ex);
             }
 
-            return new CatalogItemDto { Id = item.Id, ItemCode = item.ItemCode, Name = item.Name };
+            return ToItemDto(item);
         }
 
         public async Task<CatalogItemDto> UpdateAsync(Guid id, CatalogItemDto dto, CancellationToken cancellationToken = default)
@@ -176,10 +179,14 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             if (item.RowVersion != dto.RowVersion) throw new InvalidOperationException("CATALOG_ITEM_VERSION_CONFLICT");
 
+            if (dto.RowVersion == Guid.Empty) throw new ArgumentException("Reload the item before editing it.");
+            var barcode = ValidateBarcode(dto.Barcode, allowLegacyUnicode: dto.Barcode == item.Barcode);
+            await ValidateBarcodeAvailableAsync(barcode, id, cancellationToken);
             await ValidateReferencesAsync(dto, cancellationToken);
 
             item.ItemCode = _normalization.NormalizeItemCode(dto.ItemCode);
-            item.Barcode = _normalization.NormalizeBarcode(dto.Barcode);
+            item.Barcode = barcode;
+            item.UpdatedAt = DateTime.UtcNow;
             item.Name = dto.Name.Trim();
             item.CategoryId = dto.CategoryId;
             item.TypeId = dto.TypeId;
@@ -197,13 +204,90 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 throw new InvalidOperationException("CATALOG_ITEM_VERSION_CONFLICT");
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsCatalogIdentifierConflict(ex))
             {
-                throw new InvalidOperationException("DUPLICATE_ITEM_CODE_OR_BARCODE");
+                throw IdentifierConflict(ex);
             }
 
-            return new CatalogItemDto { Id = item.Id, ItemCode = item.ItemCode, Name = item.Name };
+            return ToItemDto(item);
         }
+
+        private Guid RequireBusiness() => _currentUser.BusinessId is Guid id && id != Guid.Empty
+            ? id : throw new UnauthorizedAccessException("Select a business first.");
+
+        private string? ValidateBarcode(string? value, bool allowLegacyUnicode = false)
+        {
+            var normalized = _normalization.NormalizeBarcode(value);
+            if (normalized == null) return null;
+            if (normalized.Length > 100 || value!.Any(char.IsControl)
+                || (!allowLegacyUnicode && normalized.Any(c => c < 32 || c > 126)))
+                throw new ArgumentException("Barcode must contain 1 to 100 printable ASCII characters (Code 128). Leading zeroes and case are preserved.");
+            return normalized;
+        }
+
+        private async Task ValidateBarcodeAvailableAsync(string? barcode, Guid? exclude, CancellationToken ct)
+        {
+            var businessId = RequireBusiness();
+            // Archived items keep their reservation. Never expose the conflicting item's identity.
+            if (barcode != null && await _context.CatalogItems.AsNoTracking()
+                .AnyAsync(i => i.BusinessId == businessId && i.Id != exclude && i.Barcode == barcode, ct))
+                throw new InvalidOperationException("DUPLICATE_BARCODE");
+        }
+
+        private static bool IsCatalogIdentifierConflict(DbUpdateException ex) =>
+            ex.InnerException is Npgsql.PostgresException { SqlState: "23505", ConstraintName:
+                "IX_CatalogItems_BusinessId_Barcode" or "IX_CatalogItems_BusinessId_ItemCode" };
+
+        private static InvalidOperationException IdentifierConflict(DbUpdateException ex) => new(
+            ((Npgsql.PostgresException)ex.InnerException!).ConstraintName == "IX_CatalogItems_BusinessId_Barcode"
+                ? "DUPLICATE_BARCODE" : "DUPLICATE_ITEM_CODE_OR_BARCODE");
+
+        public async Task<CatalogItemDto> AssignBarcodeAsync(Guid id, BarcodeAssignmentDto dto, CancellationToken cancellationToken = default)
+        {
+            var businessId = RequireBusiness();
+            var item = await _context.CatalogItems.Include(i => i.Category).Include(i => i.Type)
+                .FirstOrDefaultAsync(i => i.BusinessId == businessId && i.Id == id, cancellationToken)
+                ?? throw new KeyNotFoundException("CATALOG_ITEM_NOT_FOUND");
+            if (dto.ExpectedVersion == Guid.Empty) throw new ArgumentException("Reload the item before changing its barcode.");
+            if (item.RowVersion != dto.ExpectedVersion) throw new InvalidOperationException("CATALOG_ITEM_VERSION_CONFLICT");
+            var barcode = ValidateBarcode(dto.Barcode, allowLegacyUnicode: dto.Barcode == item.Barcode);
+            await ValidateBarcodeAvailableAsync(barcode, id, cancellationToken);
+            if (item.Barcode == barcode) return ToItemDto(item);
+            item.Barcode = barcode;
+            item.UpdatedAt = DateTime.UtcNow;
+            item.RowVersion = Guid.NewGuid();
+            try { await _context.SaveChangesAsync(cancellationToken); }
+            catch (DbUpdateConcurrencyException) { throw new InvalidOperationException("CATALOG_ITEM_VERSION_CONFLICT"); }
+            catch (DbUpdateException ex) when (IsCatalogIdentifierConflict(ex)) { throw IdentifierConflict(ex); }
+            return ToItemDto(item);
+        }
+
+        public async Task<CatalogItemDto> GenerateBarcodeAsync(Guid id, Guid expectedVersion, CancellationToken cancellationToken = default)
+        {
+            var businessId = RequireBusiness();
+            var item = await _context.CatalogItems.Include(i => i.Category).Include(i => i.Type)
+                .FirstOrDefaultAsync(i => i.BusinessId == businessId && i.Id == id, cancellationToken)
+                ?? throw new KeyNotFoundException("CATALOG_ITEM_NOT_FOUND");
+            if (expectedVersion == Guid.Empty) throw new ArgumentException("Reload the item before generating a barcode.");
+            if (item.RowVersion != expectedVersion) throw new InvalidOperationException("CATALOG_ITEM_VERSION_CONFLICT");
+            if (!item.IsActive) throw new InvalidOperationException("CATALOG_ITEM_INACTIVE");
+            if (item.Barcode != null) throw new InvalidOperationException("CATALOG_ITEM_BARCODE_EXISTS");
+            // Internal Code 128 identifier, never presented as a registered EAN/UPC/GS1 code.
+            string candidate;
+            do { candidate = "WA-" + Guid.NewGuid().ToString("N").ToUpperInvariant(); }
+            while (await _context.CatalogItems.AnyAsync(i => i.BusinessId == businessId && i.Barcode == candidate, cancellationToken));
+            // The existing unique index is the final arbiter of concurrent assignments.
+            return await AssignBarcodeAsync(id, new() { Barcode = candidate, ExpectedVersion = expectedVersion }, cancellationToken);
+        }
+
+        private static CatalogItemDto ToItemDto(CatalogItem item) => new()
+        {
+            Id = item.Id, ItemCode = item.ItemCode, Barcode = item.Barcode, Name = item.Name,
+            CategoryId = item.CategoryId, CategoryName = item.Category?.Name ?? string.Empty,
+            TypeId = item.TypeId, TypeName = item.Type?.Name, DefaultUnit = item.DefaultUnit,
+            KgPerUnit = item.KgPerUnit, ReorderLevel = item.ReorderLevel, CurrentStock = item.CurrentStock,
+            IsActive = item.IsActive, RowVersion = item.RowVersion
+        };
 
         public async Task<List<VariantDto>> GetVariantsAsync(Guid itemId, CancellationToken cancellationToken = default)
         {

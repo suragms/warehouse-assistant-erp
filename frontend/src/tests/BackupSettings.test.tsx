@@ -6,6 +6,7 @@ import BackupPage from '../pages/BackupPage';
 import HelpGuidePage from '../pages/HelpGuidePage';
 import { useAuthStore } from '../stores/authStore';
 import { exportsApi, downloadExport } from '../api/exportsApi';
+vi.mock('../components/ExportCenter', () => ({ default: () => null }));
 vi.mock('../api/exportsApi', async () => ({ ...await vi.importActual('../api/exportsApi'), exportsApi: { history: vi.fn(), run: vi.fn(), dryRun: vi.fn() }, downloadExport: vi.fn() }));
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); vi.mocked(exportsApi.history).mockResolvedValue([]);
@@ -27,11 +28,11 @@ it('offers a retry for failed history without exposing the raw error', async () 
 });
 it('runs a server backup and refreshes its history', async () => {
   vi.mocked(exportsApi.run).mockResolvedValue({ id: 'log', runType: 'manual', status: 'success', rowCounts: {}, createdAt: '2026-10-02T00:00:00Z' }); view();
-  fireEvent.click(screen.getByRole('button', { name: 'Run server backup' })); await screen.findByText('Server business backup completed.'); await waitFor(() => expect(exportsApi.history).toHaveBeenCalledTimes(2));
+  fireEvent.click(screen.getByRole('button', { name: 'Save business export' })); await screen.findByText('Server business export completed.'); await waitFor(() => expect(exportsApi.history).toHaveBeenCalledTimes(2));
 });
 it('does not claim success when a server backup fails', async () => {
-  vi.mocked(exportsApi.run).mockRejectedValue(new Error('PRIVATE')); view(); fireEvent.click(screen.getByRole('button', { name: 'Run server backup' }));
-  await screen.findByText('Server backup could not be completed. Try again.'); expect(screen.queryByText('Server business backup completed.')).not.toBeInTheDocument();
+  vi.mocked(exportsApi.run).mockRejectedValue(new Error('PRIVATE')); view(); fireEvent.click(screen.getByRole('button', { name: 'Save business export' }));
+  await screen.findByText('Server export could not be completed. Try again.'); expect(screen.queryByText('Server business export completed.')).not.toBeInTheDocument();
 });
 it('uses the selected ZIP preset and reports failed downloads', async () => {
   vi.mocked(downloadExport).mockRejectedValue(new Error('No purchases in this range.')); view();

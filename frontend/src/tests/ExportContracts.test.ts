@@ -27,7 +27,7 @@ it('deduplicates concurrent daily downloads and stamps only the successful busin
 it('does not download data after a selected-business change', async () => {
   let resolve!: (value: unknown) => void; vi.mocked(apiClient.get).mockReturnValue(new Promise(r => { resolve = r; })); const pending = downloadExport('json');
   useAuthStore.setState({ user: { ...useAuthStore.getState().user!, currentBusiness: { businessId: 'b', businessName: 'B', role: 'Owner', permissions: [] } } });
-  resolve({ data: new Blob(['PRIVATE PREVIOUS TENANT']), headers: {} }); await expect(pending).rejects.toThrow('could not be downloaded'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  resolve({ data: new Blob(['PRIVATE PREVIOUS TENANT']), headers: {} }); await expect(pending).rejects.toThrow('access changed'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
 });
 it('requests a fresh backend CSV with filters and a safe filename', async () => {
   vi.mocked(apiClient.get).mockResolvedValue({ data: new Blob(['header\nserver-value']), headers: { 'content-disposition': 'attachment; filename="harisree_stock_export.csv"' } });
@@ -40,10 +40,16 @@ it('denies financial CSV for Manager before making a request', async () => {
 it('discards CSV data when the business changes during a download', async () => {
   let resolve!: (value: unknown) => void; vi.mocked(apiClient.get).mockReturnValue(new Promise(r => { resolve = r; })); const pending = downloadCsv('stock');
   useAuthStore.setState({ user: { ...useAuthStore.getState().user!, currentBusiness: { businessId: 'b', businessName: 'B', role: 'Owner', permissions: [] } } });
-  resolve({ data: new Blob(['OTHER BUSINESS']), headers: {} }); await expect(pending).rejects.toThrow('could not be downloaded'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  resolve({ data: new Blob(['OTHER BUSINESS']), headers: {} }); await expect(pending).rejects.toThrow('access changed'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
 });
 it('discards financial CSV when owner access changes during the request', async () => {
   let resolve!: (value: unknown) => void; vi.mocked(apiClient.get).mockReturnValue(new Promise(r => { resolve = r; })); const pending = downloadCsv('report-items');
   useAuthStore.setState({ user: { ...useAuthStore.getState().user!, currentBusiness: { businessId: 'a', businessName: 'A', role: 'Manager', permissions: ['reports.view', 'stock.view'] } } });
-  resolve({ data: new Blob(['PRIVATE FINANCIAL DATA']), headers: {} }); await expect(pending).rejects.toThrow('could not be downloaded'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+  resolve({ data: new Blob(['PRIVATE FINANCIAL DATA']), headers: {} }); await expect(pending).rejects.toThrow('access changed'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+});
+
+it('discards a legacy JSON response after the owner becomes a Manager', async () => {
+  let resolve!: (value: unknown) => void; vi.mocked(apiClient.get).mockReturnValue(new Promise(r => { resolve = r; })); const pending = downloadExport('json');
+  useAuthStore.setState({ user: { ...useAuthStore.getState().user!, currentBusiness: { businessId: 'a', businessName: 'A', role: 'Manager', permissions: ['reports.view'] } } });
+  resolve({ data: new Blob(['PRIVATE OWNER FINANCIAL DATA']), headers: {} }); await expect(pending).rejects.toThrow('access changed'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
 });

@@ -3,10 +3,13 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Edit, Archive, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { catalogApi } from '../../api/catalogApi';
+import { invalidateBarcodeQueries } from '../../lib/barcodes';
 import { catalogKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Badge, Skeleton, ErrorState, ConfirmDialog } from '../../components/ui';
 import { useToast } from '../../components/ui/toastContext';
 import { PermissionGate } from '../../auth/Guards';
+import { BarcodeLabel } from '../../components/BarcodeTools';
+import BarcodeAssignment from '../../components/BarcodeAssignment';
 import CatalogVariants from './CatalogVariants';
 
 export default function CatalogDetail() {
@@ -24,7 +27,7 @@ export default function CatalogDetail() {
   const deleteMutation = useMutation({
     mutationFn: () => catalogApi.archiveItem(id!, item!.rowVersion),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
+      void invalidateBarcodeQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: catalogKeys.detail(id!) });
       queryClient.invalidateQueries({ queryKey: ['search'] });
       showToast('Item archived successfully', 'success');
@@ -112,6 +115,11 @@ export default function CatalogDetail() {
                 <dd className="mt-1 text-sm text-gray-900">{item.reorderLevel}</dd>
               </div>
             </dl>
+          </Card>
+
+          <Card className="p-6 space-y-4">
+            {item.barcode ? <BarcodeLabel value={item.barcode} name={item.name} /> : <p>No barcode assigned.</p>}
+            <BarcodeAssignment item={item} />
           </Card>
 
           <CatalogVariants itemId={item.id} variants={item.variants} />

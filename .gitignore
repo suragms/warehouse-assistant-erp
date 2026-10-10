@@ -61,3 +61,11 @@ frontend/playwright-report/
 **/App_Data/
 ml/data/
 ml/models/
+
+# Sensitive PostgreSQL recovery archives and encrypted operator events
+*.wab
+*.wabevent
+*.dump
+
+# Synthetic export layout and content validation artifacts
+tmp/pdfs/export-qa/

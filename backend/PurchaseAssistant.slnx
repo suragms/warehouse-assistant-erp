@@ -6,6 +6,7 @@
   <Project Path="PurchaseAssistant.Domain/PurchaseAssistant.Domain.csproj" />
   <Project Path="PurchaseAssistant.Infrastructure/PurchaseAssistant.Infrastructure.csproj" />
   <Project Path="PurchaseAssistant.IntegrationTests/PurchaseAssistant.IntegrationTests.csproj" />
+  <Project Path="PurchaseAssistant.RecoveryTool/PurchaseAssistant.RecoveryTool.csproj" />
   <Project Path="PurchaseAssistant.UnitTests/PurchaseAssistant.UnitTests.csproj" />
   <Project Path="PurchaseAssistant.Web/PurchaseAssistant.Web.csproj" />
 </Solution>

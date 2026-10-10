@@ -15,6 +15,10 @@ Built with **ASP.NET Core (.NET 10)** following Clean Architecture principles on
 ---
 
 
+## Database recovery backups
+
+Settings → Export & Backup now includes encrypted PostgreSQL recovery archives for explicitly configured platform operators, persistent manual/daily/monthly jobs, protected retention and separately authorized recovery preparation. Existing business report exports remain available. Supply private persistent storage, PostgreSQL tools, backup keys and operator allowlists before enabling schedules; defaults grant no access. Live database overwrite is disabled. See [configuration and implementation](docs/BACKUP_RESTORE_DESIGN.md) and the [isolated recovery drill](docs/RECOVERY_DRILL.md). Deployment qualification and external asset/key recovery remain required.
+
 ## Current verification and ML
 
 Phase 4 is **YELLOW — Production Candidate**, not a production-deployment certification. See the [current verification matrix](docs/FINAL_PRODUCTION_VERIFICATION_2026-10-04.md), [historical consumption and model promotion](docs/HISTORICAL_CONSUMPTION_AND_MODEL_PROMOTION_2026-10-04.md), [measured recovery rehearsal](docs/PRODUCTION_RECOVERY_REHEARSAL_2026-10-04.md) and [load/database evidence](docs/LOAD_AND_DATABASE_VERIFICATION_2026-10-04.md). The Phase 3 audit/matrix remain historical references.

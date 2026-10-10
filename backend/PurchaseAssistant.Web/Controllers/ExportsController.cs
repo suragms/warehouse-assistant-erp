@@ -70,9 +70,11 @@ public partial class ExportsController(AppDbContext db, ICurrentUserService user
     {
         var monthly = !start.HasValue && !end.HasValue;
         if (monthly) (start, end) = Period("month");
-        var rows = await Orders(start, end).Include(x => x.Supplier).Include(x => x.Items).ThenInclude(x => x.CatalogItem).OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Id).Take(2001).ToListAsync(ct);
-        if (rows.Count > 2000) return StatusCode(413, new { message = "Choose a shorter range (maximum 2,000 purchases)." });
-        return await Download(ExportFileBuilder.Pdf("Purchase report", rows.Count == 0 ? ["No purchases in this range."] : rows.SelectMany(PurchaseRows).Concat(Totals(rows))), "application/pdf", monthly ? $"harisree_purchases_{DateTime.UtcNow:yyyy-MM}.pdf" : "purchases.pdf");
+        var definition = ReportDefinitions.Single(x => x.Id == "purchases");
+        var filter = new ReportFilter { Start = start, End = end };
+        ValidateReportFilter(definition, filter);
+        var table = await BuildReport(definition, filter, null!, null!, ct);
+        return await Download(ExportFileBuilder.ReportPdf(table, ct), "application/pdf", monthly ? $"harisree_purchases_{DateTime.UtcNow:yyyy-MM}.pdf" : "purchases.pdf");
     }
     [HttpGet("backup.json")]
     public async Task<IActionResult> JsonBackup(DateTime? start, DateTime? end, CancellationToken ct)

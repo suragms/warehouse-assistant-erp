@@ -18,6 +18,9 @@ export async function navigationFixture(page: Page, role: NavigationRole, permis
     else if (path === '/realtime/negotiate') return route.fulfill({ status: 503, json: {} });
     else if (path === '/notifications/unread-count') data = { count: 12 };
     else if (path === '/notifications') data = paged([{ id: 'n1', title: 'Delivery ready', message: 'Check PO-NAV', referenceType: 'Purchase', referenceId: 'p1', isRead: false, createdAt: '2026-10-02T00:00:00Z' }]);
+    else if (path === '/exports/reports') data = { reports: [{ id: 'stock', title: 'Current stock', category: 'Inventory', period: false, statusFilter: 'none', itemRequired: false, formats: ['pdf', 'csv', 'xlsx'] }, { id: 'purchases', title: 'Purchase orders', category: 'Purchases', period: true, statusFilter: 'purchase', itemRequired: false, formats: ['pdf', 'csv', 'xlsx'] }], timezone: 'UTC', maxRows: 5000, missingCapabilities: [] };
+    else if (path === '/exports/reports/history') data = { items: [] };
+    else if (path.startsWith('/exports/database-backups')) return route.fulfill({ status: 403, json: { message: 'Platform operator access required.' } });
     else if (path.startsWith('/notifications/') && method !== 'GET') data = {};
     else if (path === '/dashboard') data = { purchaseMetrics: { todayPurchasesCount: 0, pendingPurchasesCount: 0, activePurchasesCount: 0, completedPurchasesCount: 0, totalPurchaseSpend: 0 }, stockMetrics: { totalCatalogItems: 0, lowStockCount: 0, outOfStockCount: 0, itermsWithPhysicalVariance: 0 }, operationalAlerts: [], recentPurchases: [], recentStockActivity: [] };
     else if (path === '/catalog/items') data = paged([item]);

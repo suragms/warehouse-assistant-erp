@@ -1,12 +1,14 @@
 @import "tailwindcss";
 @config "../../tailwind.config.js";
 
+.barcode-print-root { display: none; }
 @media print {
-  body:has(.barcode-label-print) { background: white !important; }
-  body:has(.barcode-label-print) * { visibility: hidden; }
-  body .barcode-label-print, body .barcode-label-print * { visibility: visible; }
-  body .barcode-label-print { position: fixed; top: 0; left: 0; width: 100%; overflow: visible; }
+  body:has(.barcode-print-root) { background: white !important; }
+  body:has(.barcode-print-root) > :not(.barcode-print-root) { display: none !important; }
+  body .barcode-print-root { display: block; }
+  .barcode-print-root .barcode-label-print { break-inside: avoid; overflow: visible; margin-bottom: 8mm; }
 }
+
 
 /* Preserve the existing v3 border, placeholder, focus and shadow appearance. */
 @layer base {

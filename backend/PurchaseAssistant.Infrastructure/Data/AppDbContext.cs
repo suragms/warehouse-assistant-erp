@@ -42,6 +42,10 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<BackupLog> BackupLogs => Set<BackupLog>();
         public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
 
+        public DbSet<DatabaseBackupSettings> DatabaseBackupSettings => Set<DatabaseBackupSettings>();
+        public DbSet<DatabaseBackupJob> DatabaseBackupJobs => Set<DatabaseBackupJob>();
+        public DbSet<DatabaseBackupEvent> DatabaseBackupEvents => Set<DatabaseBackupEvent>();
+
         public Guid CurrentBusinessId => _tenantProvider?.GetBusinessId() ?? Guid.Empty;
 
         private void ProtectStockLedger()
@@ -67,6 +71,8 @@ namespace PurchaseAssistant.Infrastructure.Data
         public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
             ProtectStockLedger();
+            if (ChangeTracker.Entries<DatabaseBackupEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Database recovery audit history is immutable.");
             await using var transaction = Database.IsRelational() && Database.CurrentTransaction == null ? await Database.BeginTransactionAsync(cancellationToken) : null;
             var notifications = await PrepareMutationRecordsAsync(cancellationToken);
             if (!Database.IsRelational()) Notifications.AddRange(notifications);
