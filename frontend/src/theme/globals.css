@@ -95,3 +95,96 @@
   }
   .mobile-feedback { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Shared application surfaces and accessible controls; existing domain colors remain meaningful. */
+:root { --ui-surface: #fff; --ui-canvas: #f7f9f6; --ui-soft: #f1f5f9; --ui-text: #0f172a; --ui-muted: #526176; --ui-border: #d5dfe3; }
+:root[data-theme="dark"] { color-scheme: dark; --ui-surface: #17212d; --ui-canvas: #0d1520; --ui-soft: #233043; --ui-text: #edf3fa; --ui-muted: #b7c4d5; --ui-border: #3c4c60; }
+body { background: var(--ui-canvas); color: var(--ui-text); }
+.app-content, .app-content > *, .app-content :where(fieldset, section, article) { min-width: 0; }
+.app-content :where(h1, h2, h3, p, dd, legend) { overflow-wrap: anywhere; }
+.app-content :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { max-width: 100%; min-width: 0; }
+.app-content :where(table) { font-variant-numeric: tabular-nums; }
+.app-content :where(td, th) { overflow-wrap: normal; word-break: normal; }
+.ui-button { min-height: 36px; min-width: 36px; }
+.ui-icon-button { display: inline-flex; justify-content: center; align-items: center; min-width: 40px; min-height: 40px; border-radius: 8px; }
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid #159a8a; outline-offset: 3px; }
+.ui-dialog { width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); overflow: auto; overscroll-behavior: contain; padding: 0; margin: auto; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface); color: var(--ui-text); box-shadow: 0 20px 60px #0005; }
+.ui-dialog::backdrop { background: #0008; }
+.ui-dialog :where(fieldset, input, select, textarea) { min-width: 0; max-width: 100%; }
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 12px; background: var(--ui-surface); color: var(--ui-text); border: 2px solid #159a8a; transform: translateY(-160%); }
+.skip-link:focus { transform: translateY(0); }
+@media (pointer: coarse), (max-width: 767px) {
+  :is(.app-shell, .ui-dialog) :is(button, input:not([type="checkbox"]):not([type="radio"]), select) { min-height: 44px; }
+  :is(.app-shell, .ui-dialog) button { min-width: 44px; }
+  .app-main input, .app-main select, .app-main textarea, .ui-dialog input, .ui-dialog select, .ui-dialog textarea { font-size: max(1rem, 16px); }
+  .app-content { padding-top: 16px; padding-bottom: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+
+:root[data-theme="dark"] :where(.bg-white, .bg-gray-50, .bg-slate-50, .bg-\[\#F7F9F6\]) { background-color: var(--ui-surface); }
+:root[data-theme="dark"] :where(.bg-gray-100, .bg-gray-200, .bg-slate-100, .bg-slate-200, .bg-\[\#F0FAF8\], .bg-\[\#E8F5F3\]) { background-color: var(--ui-soft); }
+:root[data-theme="dark"] :where(.text-gray-900, .text-gray-800, .text-slate-900, .text-slate-800, .text-\[\#0F172A\], .text-\[\#0E4F46\], .text-\[\#475569\]) { color: var(--ui-text); }
+:root[data-theme="dark"] :where(.text-gray-700, .text-gray-600, .text-gray-500, .text-gray-400, .text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400) { color: var(--ui-muted); }
+:root[data-theme="dark"] :where(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-200, .border-slate-300, .border-\[\#E2E8E6\]) { border-color: var(--ui-border); }
+:root[data-theme="dark"] :where(.bg-red-50, .bg-red-100) { background-color: rgb(251 113 133 / .12); }
+:root[data-theme="dark"] :where(.text-red-600, .text-red-700, .text-red-800) { color: #fda4af; }
+:root[data-theme="dark"] :where(.bg-rose-50, .bg-rose-100) { background-color: rgb(251 113 133 / .12); }
+:root[data-theme="dark"] :where(.text-rose-600, .text-rose-700, .text-rose-800) { color: #fda4af; }
+:root[data-theme="dark"] :where(.bg-amber-50, .bg-amber-100) { background-color: rgb(251 191 36 / .12); }
+:root[data-theme="dark"] :where(.text-amber-600, .text-amber-700, .text-amber-800) { color: #fcd34d; }
+:root[data-theme="dark"] :where(.bg-yellow-50, .bg-yellow-100) { background-color: rgb(251 191 36 / .12); }
+:root[data-theme="dark"] :where(.text-yellow-600, .text-yellow-700, .text-yellow-800) { color: #fcd34d; }
+:root[data-theme="dark"] :where(.bg-green-50, .bg-green-100) { background-color: rgb(52 211 153 / .12); }
+:root[data-theme="dark"] :where(.text-green-600, .text-green-700, .text-green-800) { color: #6ee7b7; }
+:root[data-theme="dark"] :where(.bg-emerald-50, .bg-emerald-100) { background-color: rgb(52 211 153 / .12); }
+:root[data-theme="dark"] :where(.text-emerald-600, .text-emerald-700, .text-emerald-800) { color: #6ee7b7; }
+:root[data-theme="dark"] :where(.bg-teal-50, .bg-teal-100) { background-color: rgb(45 212 191 / .12); }
+:root[data-theme="dark"] :where(.text-teal-600, .text-teal-700, .text-teal-800) { color: #5eead4; }
+:root[data-theme="dark"] :where(.bg-blue-50, .bg-blue-100) { background-color: rgb(96 165 250 / .12); }
+:root[data-theme="dark"] :where(.text-blue-600, .text-blue-700, .text-blue-800) { color: #93c5fd; }
+:root[data-theme="dark"] :where(.bg-indigo-50, .bg-indigo-100) { background-color: rgb(129 140 248 / .12); }
+:root[data-theme="dark"] :where(.text-indigo-600, .text-indigo-700, .text-indigo-800) { color: #a5b4fc; }
+:root[data-theme="dark"] :where(.bg-purple-50, .bg-purple-100) { background-color: rgb(192 132 252 / .12); }
+:root[data-theme="dark"] :where(.text-purple-600, .text-purple-700, .text-purple-800) { color: #d8b4fe; }
+:root[data-theme="dark"] :where(input, select, textarea) { background-color: var(--ui-surface); color: var(--ui-text); border-color: var(--ui-border); }
+@media print { :root[data-theme="dark"] { color-scheme: light; --ui-surface: #fff; --ui-text: #000; } .skip-link { display: none; } }
+
+/* Caption and hover contrast is shared across the ERP, including dense tables. */
+:root:not([data-theme="dark"]) :where(.text-gray-400, .text-slate-400, .text-gray-300, .text-slate-300, .text-\[\#64748B\]) { color: #526176; }
+:root:not([data-theme="dark"]) :where(.text-amber-600, .text-orange-600) { color: #92400e; }
+button.bg-amber-600 { background-color: #b45309; }
+:root[data-theme="dark"] :where(.text-indigo-900, .text-blue-900, .text-green-900) { color: var(--ui-text); }
+:root[data-theme="dark"] :where(.hover\:bg-gray-50, .hover\:bg-gray-100, .hover\:bg-slate-50, .hover\:bg-slate-100, .hover\:bg-slate-200, .hover\:bg-white, .hover\:bg-\[\#F7F9F6\]):hover { background-color: var(--ui-soft); }
+:root[data-theme="dark"] :where(.text-gray-300, .text-slate-300, .text-\[\#64748B\]) { color: var(--ui-muted); }
+
+:root:not([data-theme="dark"]) :where(.text-emerald-600, .text-green-600) { color: #047857; }
+:root:not([data-theme="dark"]) :where(.text-teal-600, .text-\[\#159A8A\]) { color: #0f766e; }
+:root:not([data-theme="dark"]) :where(.text-red-500, .text-rose-500) { color: #be123c; }
+:root:not([data-theme="dark"]) :where(.text-yellow-600) { color: #854d0e; }
+button.bg-emerald-600 { background-color: #047857; }
+
+/* Label artwork must remain black on white in both preview and print themes. */
+:root .barcode-label-print { color: #000; background: #fff; }
+
+/* Business records use cards on phones; comparison columns retain readable widths. */
+.erp-record-list { display: grid; gap: .75rem; min-width: 0; padding: .75rem; }
+.erp-record-card { min-width: 0; border: 1px solid var(--ui-border); border-radius: .75rem; padding: 1rem; background: var(--ui-surface); display: grid; gap: .75rem; }
+.erp-record-title { color: var(--ui-text); font-size: 1rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.erp-record-title :where(a, button) { text-align: left; max-width: 100%; }
+.erp-record-subtitle { margin-top: .25rem; color: var(--ui-muted); font-size: .875rem; overflow-wrap: anywhere; }
+.erp-record-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; font-size: .875rem; }
+.erp-record-fields dt { color: var(--ui-muted); margin-bottom: .125rem; }
+.erp-record-fields dd { color: var(--ui-text); margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.erp-record-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; border-top: 1px solid var(--ui-border); padding-top: .75rem; }
+.erp-record-actions :where(a, button) { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.erp-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.erp-table-scroll table { width: 100%; min-width: var(--erp-table-min-width, 40rem); font-variant-numeric: tabular-nums; }
+.erp-table-scroll th { white-space: nowrap; }
+.erp-table-scroll :where(td, th) { overflow-wrap: normal; word-break: normal; }
+.erp-table-scroll td :where(button, input, select) { flex-shrink: 0; }
+@media (max-width: 767px) {
+  .erp-record-fields { column-gap: .75rem; }
+  .erp-record-actions { justify-content: flex-start; }
+  .auth-page :where(input, select, button) { min-height: 44px; font-size: 1rem; }
+  .auth-page :where(form, fieldset, input, select) { min-width: 0; max-width: 100%; }
+}

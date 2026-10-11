@@ -5,13 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PurchaseForm from '../pages/purchases/PurchaseForm';
 import { ToastProvider } from '../components/ui/ToastProvider';
 import { purchaseIntentApi, type PurchaseIntentCandidateDto } from '../api/purchaseIntentApi';
+import { purchaseKeys } from '../lib/queryKeys';
 import { purchaseApi } from '../api/purchaseApi';
 import { supplierApi } from '../api/supplierApi';
 import { brokerApi } from '../api/brokerApi';
 import { catalogApi } from '../api/catalogApi';
 
 vi.mock('../api/purchaseIntentApi', () => ({ purchaseIntentApi: { parseIntent: vi.fn() } }));
-vi.mock('../api/purchaseApi', () => ({ purchaseApi: { createPurchase: vi.fn(), updatePurchase: vi.fn(), previewPurchase: vi.fn() } }));
+vi.mock('../api/purchaseApi', () => ({ purchaseApi: { createPurchase: vi.fn(), updatePurchase: vi.fn(), previewPurchase: vi.fn(), getPurchaseById: vi.fn() } }));
 vi.mock('../api/supplierApi', () => ({ supplierApi: { getSuppliers: vi.fn() } }));
 vi.mock('../api/brokerApi', () => ({ brokerApi: { getBrokers: vi.fn() } }));
 vi.mock('../api/catalogApi', () => ({ catalogApi: { getItems: vi.fn() } }));
@@ -20,13 +21,13 @@ const draft = (): PurchaseIntentCandidateDto => ({ status: 'Success', supplierId
   items: [{ catalogItemId: 'c1', catalogItemName: 'Rice', requestedQuantity: 2.5, isAmbiguous: false }] });
 const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (error: unknown) => void;
   const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; };
-const renderForm = () => {
+const renderForm = (edit = false) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, 'invalidateQueries');
-  render(<QueryClientProvider client={client}><ToastProvider><MemoryRouter initialEntries={['/new']}><Routes>
-    <Route path="/new" element={<PurchaseForm />} /><Route path="/purchases/:id" element={<p>Purchase detail</p>} />
+  render(<QueryClientProvider client={client}><ToastProvider><MemoryRouter initialEntries={[edit ? '/purchases/p1/edit' : '/new']}><Routes>
+    <Route path="/new" element={<PurchaseForm />} /><Route path="/purchases/:id/edit" element={<PurchaseForm edit />} /><Route path="/purchases/:id" element={<p>Purchase detail</p>} />
   </Routes></MemoryRouter></ToastProvider></QueryClientProvider>);
-  return { invalidate };
+  return { invalidate, client };
 };
 const analyze = async () => {
   fireEvent.change(screen.getByLabelText('Enter purchase request'), { target: { value: 'Buy 2.5 Rice from Supplier A' } });
@@ -205,4 +206,13 @@ describe('Purchase assistant and authoritative submit', () => {
     vi.mocked(purchaseIntentApi.parseIntent).mockResolvedValue(candidate); renderForm(); await analyze(); apply();
     expect(screen.getByLabelText('Catalog item 1')).toHaveValue('c300'); expect(screen.getByRole('option', { name: 'Other item' })).toBeInTheDocument();
   });
+});
+
+it('preserves a draft and uses the original edit version after a background refresh', async () => {
+  const order = { id: 'p1', version: 7, status: 0, supplierId: 's1', orderNumber: 'PO-1', notes: 'Initial note', items: [{ catalogItemId: 'c1', orderedQuantity: 2, receivedQuantity: 0, unitPrice: 5, unit: 'KG' }] };
+  vi.mocked(purchaseApi.getPurchaseById).mockResolvedValue(order as never); const { client } = renderForm(true);
+  const notes = await screen.findByLabelText('Purchase notes'); fireEvent.change(notes, { target: { value: 'My draft note' } });
+  await act(async () => { client.setQueryData(purchaseKeys.detail('p1'), { ...order, version: 8, notes: 'Concurrent change' }); });
+  expect(notes).toHaveValue('My draft note'); fireEvent.submit(notes.closest('form')!);
+  await screen.findByRole('button', { name: 'Update Purchase Order' }); expect(purchaseApi.previewPurchase).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 7, notes: 'My draft note' }));
 });

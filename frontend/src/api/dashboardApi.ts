@@ -7,7 +7,7 @@ export interface DashboardMetricsDto {
     pendingPurchasesCount: number;
     activePurchasesCount: number;
     completedPurchasesCount: number;
-    totalPurchaseSpend: number;
+    totalPurchaseSpend?: number;
   };
   stockMetrics: {
     totalCatalogItems: number;
@@ -37,7 +37,7 @@ export interface DashboardMetricsDto {
     status: PurchaseStatus;
     deliveryState: DeliveryState;
     paymentState: PaymentState;
-    grandTotal: number;
+    grandTotal?: number;
     createdAt: string;
   }>;
   recentStockActivity: Array<{

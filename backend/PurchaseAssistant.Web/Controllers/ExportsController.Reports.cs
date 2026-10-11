@@ -190,7 +190,7 @@ public partial class ExportsController
             if (orders.Count > 2000) throw new ArgumentException("Choose at most 2,000 purchases.");
             if (f.PurchaseId.HasValue && orders.Count == 0) throw new KeyNotFoundException("Purchase not found in this range.");
             if (id == "delivery") { columns = [C("Order"), C("Supplier", weight: 2), C("Status"), C("Created UTC"), C("Confirmed UTC"), C("Dispatched UTC"), C("Arrived UTC"), C("Verified UTC"), C("Completed UTC")]; rows = orders.Select(x => new object?[] { x.OrderNumber, x.Supplier.Name, x.Status.ToString(), x.CreatedAt, x.ConfirmedAt, x.DispatchedAt, x.ArrivedAt, x.VerifiedAt, x.CompletedAt }).ToList(); }
-            else if (id == "supplier-purchases") { columns = [C("Order"), C("Created UTC"), C("Supplier", weight: 2), C("Status"), C("Total INR", "money"), C("Paid INR", "money"), C("Outstanding INR", "money")]; rows = orders.Select(x => new object?[] { x.OrderNumber, x.CreatedAt, x.Supplier.Name, x.Status.ToString(), x.GrandTotal, x.PaidAmount, x.GrandTotal - x.PaidAmount }).ToList(); }
+            else if (id == "supplier-purchases") { columns = [C("Order"), C("Created UTC"), C("Supplier", weight: 2), C("Status"), C("Total INR", "money"), C("Paid INR", "money"), C("Outstanding INR", "money")]; rows = orders.Select(x => new object?[] { x.OrderNumber, x.CreatedAt, x.Supplier.Name, x.Status.ToString(), x.GrandTotal, x.PaidAmount, Math.Max(0, x.GrandTotal - x.PaidAmount) }).ToList(); }
             else
             {
                 columns = [C("Order"), C("Created UTC"), C("Supplier", weight: 1.5f), C("Status"), C("Item", weight: 2.5f), C("Unit"), C("Ordered"), C("Received")];
@@ -198,7 +198,7 @@ public partial class ExportsController
                 foreach (var order in orders) foreach (var line in order.Items.OrderBy(x => x.Id)) { object?[] row = [order.OrderNumber, order.CreatedAt, order.Supplier.Name, order.Status.ToString(), line.CatalogItem.Name, line.Unit, line.OrderedQuantity, line.ReceivedQuantity]; rows.Add(Money ? [..row, line.LineTotal] : row); if (rows.Count > 5000) throw new ArgumentException("Choose at most 5,000 purchase lines."); }
             }
             notes.Add(id == "delivery" ? "Lifecycle of saved purchases, including Draft and Cancelled. Missing timestamps are unavailable." : f.PurchaseId.HasValue ? "Individual saved purchase, including its actual status. Line totals are separate from header charges." : "Reporting eligibility excludes Draft and Cancelled. Lines retain their saved units; mixed units are not summed.");
-            if (Money && id != "delivery") notes.Add($"Orders {orders.Count}; Total INR {MoneyAmount(orders.Sum(x => x.GrandTotal))}; Paid INR {MoneyAmount(orders.Sum(x => x.PaidAmount))}; Outstanding INR {MoneyAmount(orders.Sum(x => x.GrandTotal - x.PaidAmount))}. Header totals include saved discounts and charges.");
+            if (Money && id != "delivery") notes.Add($"Orders {orders.Count}; Total INR {MoneyAmount(orders.Sum(x => x.GrandTotal))}; Paid INR {MoneyAmount(orders.Sum(x => x.PaidAmount))}; Outstanding INR {MoneyAmount(orders.Sum(x => Math.Max(0, x.GrandTotal - x.PaidAmount)))}. Header totals include saved discounts and charges.");
         }
         else if (id is "purchase-summary" or "spend" or "comparison")
         {

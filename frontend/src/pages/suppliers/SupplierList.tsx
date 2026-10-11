@@ -1,3 +1,4 @@
+import { ResponsiveRecords, RecordCard, RecordFields, DataTableScroll } from '../../components/ui/ResponsiveRecords';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Package } from 'lucide-react';
@@ -66,7 +67,7 @@ export default function SupplierList() {
       setDeleteOpen(false);
     },
     onError: (err: any) => {
-      showToast(err.normalized?.message || err.normalized === 'SUPPLIER_IN_USE' ? 'Cannot delete supplier that is in use.' : 'Failed to delete', 'error');
+      showToast(err.normalized === 'SUPPLIER_IN_USE' ? 'Cannot delete supplier that is in use.' : (err.normalized?.message || 'Failed to delete'), 'error');
       setDeleteOpen(false);
     }
   });
@@ -104,6 +105,20 @@ export default function SupplierList() {
     saveMutation.mutate({ name, phone, address, notes, isActive });
   };
 
+  const recordActions = (s: Supplier) => <div className="flex flex-wrap items-center justify-end gap-2">
+{hasPermission(user, 'purchase.view') && <Button variant="ghost" size="sm" onClick={() => setHistory(s)}>History</Button>}
+                    {s.isActive && <CsvExportButton kind="supplier" label="Purchase CSV" supplierId={s.id} />}
+                    <Button variant="ghost" size="sm" aria-label={`Manage items for ${s.name}`} onClick={() => setSupplierForItems(s)}>
+                      <Package className="h-4 w-4" />
+                    </Button>
+                    {hasPermission(user, 'supplier.edit') && <Button variant="ghost" size="sm" aria-label={`Edit ${s.name}`} onClick={() => handleOpenEdit(s)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>}
+                    {hasPermission(user, 'supplier.delete') && <Button variant="ghost" size="sm" aria-label={`Delete ${s.name}`} className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setSupplierIdToDelete(s.id); setDeleteOpen(true); }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>}
+  </div>;
+
   return (
     <div>
       <PageHeader
@@ -120,7 +135,7 @@ export default function SupplierList() {
         <span className="py-2 text-sm">Page {page}</span>
         <Button variant="secondary" disabled={isLoading || !data || data.length < 50} onClick={() => setPage(p => p + 1)}>Next</Button>
       </div>
-      <Card className="overflow-x-auto">
+      <Card className="overflow-hidden">
         {isLoading ? (
           <div className="p-4 space-y-4">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
@@ -128,6 +143,14 @@ export default function SupplierList() {
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
         ) : (
+          <ResponsiveRecords label="Suppliers" mobile={<div className="space-y-3">{data?.map(s => <RecordCard key={s.id} title={s.name} actions={recordActions(s)}>
+                <RecordFields fields={[
+                  { label: 'Phone', value: s.phone || '—' },
+                  { label: 'Linked items', value: s.linkedItemsCount },
+                  { label: 'Status', value: <Badge variant={s.isActive ? 'green' : 'gray'}>{s.isActive ? 'Active' : 'Inactive'}</Badge> },
+                ]} />
+              </RecordCard>)}{data?.length === 0 && <p className="p-4 text-center text-sm text-gray-500">No suppliers found.</p>}</div>}>
+            <DataTableScroll label="Suppliers table" minWidth="48rem">
           <table className="min-w-full text-sm text-left">
             <thead className="bg-gray-50 text-[#475569] font-medium border-b border-[#E2E8E6]">
               <tr>
@@ -147,18 +170,7 @@ export default function SupplierList() {
                   <td className="px-4 py-3">
                     {s.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}
                   </td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    {hasPermission(user, 'purchase.view') && <Button variant="ghost" size="sm" onClick={() => setHistory(s)}>History</Button>}
-                    {s.isActive && <CsvExportButton kind="supplier" label="Purchase CSV" supplierId={s.id} />}
-                    <Button variant="ghost" size="sm" aria-label={`Manage items for ${s.name}`} onClick={() => setSupplierForItems(s)}>
-                      <Package className="h-4 w-4" />
-                    </Button>
-                    {hasPermission(user, 'supplier.edit') && <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(s)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>}
-                    {hasPermission(user, 'supplier.delete') && <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setSupplierIdToDelete(s.id); setDeleteOpen(true); }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>}
+                  <td className="px-4 py-3 text-right space-x-2">{recordActions(s)}
                   </td>
                 </tr>
               ))}
@@ -171,6 +183,8 @@ export default function SupplierList() {
               )}
             </tbody>
           </table>
+            </DataTableScroll>
+          </ResponsiveRecords>
         )}
       </Card>
 
@@ -191,6 +205,7 @@ export default function SupplierList() {
           />
           <Input
             label="Phone Number"
+            type="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
           />
@@ -215,7 +230,7 @@ export default function SupplierList() {
             <label htmlFor="isActiveSupplier" className="text-sm font-medium">Active</label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-wrap justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
             <Button type="submit" loading={saveMutation.isPending}>Save</Button>
           </div>
@@ -307,7 +322,7 @@ function SupplierItemsDialog({ supplier, onClose }: { supplier: Supplier | null;
           <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} /> Preferred supplier for this item</label>
           {formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
-          {catalogQuery.isError && <p role="alert" className="text-sm text-red-700">Could not load catalog items.</p>}
+          {catalogQuery.isError && <ErrorState message="Could not load catalog items." onRetry={() => void catalogQuery.refetch()} />}
           <Button type="submit" loading={addMutation.isPending}>Link item</Button>
         </form>}
 
@@ -338,11 +353,11 @@ function SupplierItemRow({ link, saving, removing, onSave, onRemove, canEdit }: 
   const changed = supplierItemCode !== (link.supplierItemCode ?? '') || isDefault !== link.isDefault || notes !== (link.notes ?? '');
   return (
     <fieldset disabled={!canEdit} className="rounded border border-[#E2E8E6] p-3 space-y-2">
-      <div className="font-medium">{link.itemName} <span className="text-gray-500 font-normal">({link.itemCode})</span></div>
+      <div className="min-w-0 break-words font-medium">{link.itemName} <span className="text-gray-500 font-normal">({link.itemCode})</span></div>
       <Input aria-label={`Supplier item code for ${link.itemName}`} label="Supplier item code" value={supplierItemCode} maxLength={128} onChange={e => setSupplierItemCode(e.target.value)} />
       <Textarea aria-label={`Notes for ${link.itemName}`} label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} /> Preferred supplier for this item</label>
-      {canEdit && <div className="flex justify-end gap-2">
+      {canEdit && <div className="flex flex-wrap justify-end gap-2">
         <Button variant="ghost" size="sm" className="text-red-600" disabled={removing} onClick={onRemove}><Trash2 className="h-4 w-4" /> Unlink</Button>
         <Button size="sm" disabled={!changed} loading={saving} onClick={() => onSave({ catalogItemId: link.catalogItemId, supplierItemCode, isDefault, notes })}>Save</Button>
       </div>}

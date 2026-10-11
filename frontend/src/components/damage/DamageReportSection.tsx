@@ -1,3 +1,4 @@
+import { hasPermission } from '../../auth/hasPermission';
 import { SafeImage } from '../SafeImage';
 import { purchaseErrorMessage } from '../../lib/purchaseValidation';
 import React, { useState } from 'react';
@@ -26,9 +27,9 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
     emitNotification: true
   });
   const queryClient = useQueryClient();
-  const business = useAuthStore(state => state.user?.currentBusiness);
-  const can = (permission: string) =>
-    business?.role === 'Owner' || business?.role === 'SuperAdmin' || !!business?.permissions.includes(permission);
+  const user = useAuthStore(state => state.user);
+  const can = (permission: string) => hasPermission(user, permission);
+  const [validation, setValidation] = useState('');
 
   const { data: reports = [], isLoading, error, refetch } = useQuery({
     queryKey: ['damage-reports', purchaseOrderId],
@@ -54,10 +55,12 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.qtyDamaged <= 0) {
-      alert('Please enter a positive damaged quantity.');
+    if (createMutation.isPending) return;
+    if (!Number.isFinite(formData.qtyDamaged) || formData.qtyDamaged <= 0) {
+      setValidation('Please enter a positive damaged quantity.');
       return;
     }
+    setValidation('');
     createMutation.mutate(formData);
   };
 
@@ -89,7 +92,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+      <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-wrap gap-3 items-center justify-between">
         <div className="flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600" />
           <h2 className="text-lg font-semibold text-slate-900">Damage Reports</h2>
@@ -117,14 +120,14 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-slate-900">Report New Damage</h3>
             <button
-              onClick={() => setShowForm(false)}
+              aria-label="Close damage form" onClick={() => setShowForm(false)}
               className="p-1 text-slate-400 hover:text-slate-600"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">{validation && <p role="alert" className="text-red-700">{validation}</p>}
             <label className="block text-sm">Photo URL (HTTPS)<input type="url" maxLength={2000} className="block w-full border rounded p-3" value={formData.photoUrl ?? ''} onChange={e => setFormData({ ...formData, photoUrl: e.target.value || undefined })} /></label>
             {formData.photoUrl && <SafeImage src={formData.photoUrl} alt="Damage photo preview" />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -133,7 +136,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                   Select Item
                 </label>
                 <select
-                  value={formData.catalogItemId || ''}
+                  aria-label="Damage item" value={formData.catalogItemId || ''}
                   onChange={(e) => {
                     const item = orderItems.find(i => i.catalogItemId === e.target.value);
                     setFormData({
@@ -160,7 +163,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                   </label>
                   <input
                     type="text"
-                    value={formData.itemName || ''}
+                    aria-label="Custom damaged item name" value={formData.itemName || ''}
                     onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
                     placeholder="Enter item name"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -176,7 +179,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                   type="number"
                   min="0.01"
                   step="0.01"
-                  value={formData.qtyDamaged}
+                  aria-label="Damaged quantity" value={formData.qtyDamaged}
                   onChange={(e) => setFormData({ ...formData, qtyDamaged: parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                   required
@@ -188,7 +191,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                   Damage Type
                 </label>
                 <select
-                  value={formData.damageType}
+                  aria-label="Damage type" value={formData.damageType}
                   onChange={(e) => setFormData({ ...formData, damageType: e.target.value as any })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
@@ -204,7 +207,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                   Reason
                 </label>
                 <select
-                  value={formData.reason || ''}
+                  aria-label="Damage reason" value={formData.reason || ''}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value as any || undefined })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
@@ -222,7 +225,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                   Notes
                 </label>
                 <textarea
-                  value={formData.notes || ''}
+                  aria-label="Damage notes" value={formData.notes || ''}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
                   placeholder="Additional details about the damage..."
@@ -253,7 +256,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
 
       {/* Reports List */}
       <div className="p-6">
-        {reports.length === 0 ? (
+        {error ? null : reports.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
             <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-slate-300" />
             <p>No damage reports for this purchase order.</p>
@@ -268,9 +271,9 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                 key={report.id}
                 className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                <div className="flex flex-wrap gap-3 items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
                       {getStatusIcon(report.status)}
                       <h4 className="font-medium text-slate-900">{report.itemName}</h4>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(report.status)}`}>

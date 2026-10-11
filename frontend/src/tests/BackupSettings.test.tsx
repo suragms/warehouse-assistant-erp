@@ -10,7 +10,7 @@ vi.mock('../components/ExportCenter', () => ({ default: () => null }));
 vi.mock('../api/exportsApi', async () => ({ ...await vi.importActual('../api/exportsApi'), exportsApi: { history: vi.fn(), run: vi.fn(), dryRun: vi.fn() }, downloadExport: vi.fn() }));
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); vi.mocked(exportsApi.history).mockResolvedValue([]);
-  useAuthStore.setState({ user: { id: 'u1', name: 'Owner', email: 'owner@example.test', businesses: [], currentBusiness: { businessId: 'a', businessName: 'A', role: 'Owner', permissions: [] } } });
+  useAuthStore.setState({ isAuthenticated: true, user: { id: 'u1', name: 'Owner', email: 'owner@example.test', businesses: [], currentBusiness: { businessId: 'a', businessName: 'A', role: 'Owner', permissions: [] } } });
 });
 function view(help = false) { return render(<MemoryRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}>{help ? <HelpGuidePage /> : <BackupPage />}</QueryClientProvider></MemoryRouter>); }
 it('shows loading followed by an honest empty history', async () => {

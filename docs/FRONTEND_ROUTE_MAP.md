@@ -1,5 +1,16 @@
 # Frontend Route Map
 
+## Latest all-pages route evidence (2026-10-11)
+
+[ALL_PAGES_RESPONSIVE_AUDIT.md](ALL_PAGES_RESPONSIVE_AUDIT.md) lists every registered pattern, actual source, guard, implemented correction and final status. There are **40 addressable route samples**, including redirects/public auth/wildcard. The current matrix uses **320/360/390/427/768/1024/1366/1920px** with their requested heights in both themes, and separately exercises nested dialogs/populated branches. The older five-size inventory below is historical.
+
+## Current route inventory (2026-10-11)
+
+See [FRONTEND_UI_VERIFICATION.md](FRONTEND_UI_VERIFICATION.md) for the full accessible-page, dialog and workflow checklist with source paths, permissions and verification limits. `router/index.tsx` now also registers guarded `/suppliers/:id` and `/brokers/:id` detail pages using the existing catalog APIs, repairing links from search and catalog details. There is no standalone roles route: role and permission workflows remain inside Users. Export Center/database recovery remain within `/settings/backup`.
+
+`frontend/e2e/responsive-routes.spec.ts` contains one sample for every registered URL pattern, including redirects, authentication and not-found. It records geometry/content/errors/screenshots at all five requested viewports in light and dark themes. The earlier route overview below is retained as historical context.
+
+
 Root architecture utilizing React Router v7 (or v6 Data API).
 
 ## Public Routes

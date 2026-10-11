@@ -1,3 +1,5 @@
+import { ResponsiveRecords, RecordCard, RecordFields, DataTableScroll } from '../../components/ui/ResponsiveRecords';
+import { PermissionGate } from '../../auth/Guards';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2 } from 'lucide-react';
@@ -86,13 +88,22 @@ export default function CategoryList() {
     saveMutation.mutate(name);
   };
 
+  const recordActions = (c: Category) => <div className="flex flex-wrap items-center justify-end gap-2">
+<PermissionGate permission="catalog.edit"><Button aria-label={`Edit ${c.name}`} variant="ghost" size="sm" onClick={() => handleOpenEdit(c)}>
+                      <Edit className="h-4 w-4" />
+                    </Button></PermissionGate>
+                    <PermissionGate permission="catalog.archive"><Button aria-label={`Delete ${c.name}`} variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setCategoryIdToDelete(c.id); setDeleteOpen(true); }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button></PermissionGate>
+  </div>;
+
   return (
     <div>
       <PageHeader
         title="Categories"
         subtitle="Manage product categories"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={handleOpenNew}>New Category</Button>
+          <PermissionGate permission="catalog.create"><Button icon={<Plus className="h-4 w-4" />} onClick={handleOpenNew}>New Category</Button></PermissionGate>
         }
       />
 
@@ -104,6 +115,10 @@ export default function CategoryList() {
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
         ) : (
+          <ResponsiveRecords label="Categories" mobile={<div className="space-y-3">{data?.map(c => <RecordCard key={c.id} title={c.name} actions={recordActions(c)}>
+                <RecordFields fields={[{ label: 'Items', value: c.itemCount }]} />
+              </RecordCard>)}{data?.length === 0 && <p className="p-4 text-center text-sm text-gray-500">No categories found.</p>}</div>}>
+            <DataTableScroll label="Categories table" minWidth="30rem">
           <table className="min-w-full text-sm text-left">
             <thead className="bg-gray-50 text-[#475569] font-medium border-b border-[#E2E8E6]">
               <tr>
@@ -117,13 +132,7 @@ export default function CategoryList() {
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-[#0F172A]">{c.name}</td>
                   <td className="px-4 py-3 text-right text-gray-500">{c.itemCount}</td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(c)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setCategoryIdToDelete(c.id); setDeleteOpen(true); }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <td className="px-4 py-3 text-right space-x-2">{recordActions(c)}
                   </td>
                 </tr>
               ))}
@@ -136,6 +145,8 @@ export default function CategoryList() {
               )}
             </tbody>
           </table>
+            </DataTableScroll>
+          </ResponsiveRecords>
         )}
       </Card>
 
@@ -152,7 +163,7 @@ export default function CategoryList() {
             error={errorMsg}
             autoFocus
           />
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-wrap justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
             <Button type="submit" loading={saveMutation.isPending}>Save</Button>
           </div>

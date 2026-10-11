@@ -55,6 +55,9 @@ export function MobileNavigation({ user, items, onSearch, onLogout, onSelectBusi
   useEffect(() => {
     if (!open) return;
     const triggerElement = trigger.current;
+    const background = Array.from(document.querySelectorAll<HTMLElement>('.app-main, .app-header, .mobile-bottom-nav'));
+    const previousInert = background.map(element => element.inert);
+    background.forEach(element => { element.inert = true; });
     panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const handleKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'k') { setOpenScope(null); return; }
@@ -67,7 +70,7 @@ export function MobileNavigation({ user, items, onSearch, onLogout, onSelectBusi
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
     window.addEventListener('keydown', handleKey);
-    return () => { window.removeEventListener('keydown', handleKey); triggerElement?.focus(); };
+    return () => { window.removeEventListener('keydown', handleKey); background.forEach((element, index) => { element.inert = previousInert[index]; }); if (!document.querySelector('dialog[open]')) triggerElement?.focus(); };
   }, [open]);
   const isPrimaryActive = (prefix: string) => prefix.endsWith('/') ? location.pathname.startsWith(prefix) : location.pathname === prefix;
   const moreActive = !primary.some(item => isPrimaryActive(item.prefix));

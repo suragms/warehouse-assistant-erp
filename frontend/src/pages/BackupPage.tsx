@@ -7,7 +7,7 @@ import { PageHeader } from '../components/ui';
 import { useAuthStore } from '../stores/authStore';
 import { backupDeviceKey, canExport, dailyAutoBackup, downloadExport, exportsApi, type DryRun } from '../api/exportsApi';
 const section = 'rounded-xl border bg-white p-4 space-y-4 min-w-0';
-const button = 'px-4 py-3 rounded bg-emerald-800 text-white disabled:opacity-50';
+const button = 'max-w-full whitespace-normal px-4 py-3 rounded bg-emerald-800 text-white disabled:opacity-50';
 const field = 'block w-full min-w-0 border rounded p-3 mt-1';
 const names = { stock: 'Stock Excel', pdf: 'Monthly purchases PDF', json: 'Business JSON · last 90 days', zip: 'Purchase ZIP' };
 function deviceRead(key: string) { try { return localStorage.getItem(key); } catch { return null; } }

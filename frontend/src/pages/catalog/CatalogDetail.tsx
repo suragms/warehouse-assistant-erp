@@ -19,7 +19,7 @@ export default function CatalogDetail() {
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = React.useState(false);
 
-  const { data: item, isLoading, error } = useQuery({
+  const { data: item, isLoading, error, refetch } = useQuery({
     queryKey: catalogKeys.detail(id!),
     queryFn: () => catalogApi.getItemById(id!),
   });
@@ -45,7 +45,7 @@ export default function CatalogDetail() {
   }
 
   if (error || !item) {
-    return <ErrorState message="Item not found or failed to load." onRetry={() => navigate('/catalog/items')} />;
+    return <ErrorState message="Item not found or failed to load." onRetry={() => void refetch()} />;
   }
 
   return (
@@ -125,9 +125,10 @@ export default function CatalogDetail() {
           <CatalogVariants itemId={item.id} variants={item.variants} />
 
           <Card className="p-6">
-            <h3 className="text-lg font-medium text-[#0F172A] border-b pb-2 mb-4">Purchase History</h3>
+            <h3 className="text-lg font-medium text-[#0F172A] border-b pb-2 mb-4">Related records</h3>
             <div className="flex flex-col items-center justify-center py-6">
-              <p className="text-sm text-gray-500 text-center">No purchase history yet.</p>
+              <PermissionGate permission="purchase.view"><Link className="underline py-2" to="/purchases/list">Browse saved purchases</Link></PermissionGate>
+              <PermissionGate permission="stock.view"><Link className="underline py-2" to={`/inventory/${item.id}/activity`}>View this item’s stock activity</Link></PermissionGate>
             </div>
           </Card>
         </div>
@@ -135,9 +136,9 @@ export default function CatalogDetail() {
         <div className="space-y-6">
           <Card className="p-6 bg-[#0E4F46] text-white">
             <h3 className="text-sm font-medium text-[#B8D4CF] mb-1">Current System Stock</h3>
-            <div className="text-4xl font-bold">
+            <div className="flex flex-wrap items-baseline gap-2 text-3xl sm:text-4xl font-bold">
               {item.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-              <span className="text-xl font-normal ml-2 text-[#8FC4BC]">{item.defaultUnit}</span>
+              <span className="text-xl font-normal text-[#8FC4BC]">{item.defaultUnit}</span>
             </div>
             {item.currentStock <= item.reorderLevel && item.reorderLevel > 0 && (
               <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/20 text-yellow-200 text-sm rounded-full">

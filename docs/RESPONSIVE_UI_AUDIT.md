@@ -1,5 +1,26 @@
 # Application-wide responsive UI audit
 
+## All-pages readability follow-up (2026-10-11)
+
+The complete 40-route source inventory, page-specific fixes, eight-size light/dark tests, populated record/receipt/report checks and before/after artifacts are in [ALL_PAGES_RESPONSIVE_AUDIT.md](ALL_PAGES_RESPONSIVE_AUDIT.md) and [ALL_PAGES_RESPONSIVE_FIX_REPORT.md](ALL_PAGES_RESPONSIVE_FIX_REPORT.md). The older five-size results below are historical and did not establish table readability. The latest report records actual final commands, results and remaining device/live-backend limits.
+
+## Application-wide frontend follow-up (2026-10-11)
+
+The route inventory and implementation/verification checklist now live in [FRONTEND_UI_VERIFICATION.md](FRONTEND_UI_VERIFICATION.md). Every registered page is represented by 40 URL samples, with five requested viewports and both light/dark themes in the new Edge matrix. Historical findings below describe the pre-change state; the follow-up document records their current bounded classifications, actual fixes, tests and remaining live-data/device limits.
+
+Implemented within the existing frontend: shared responsive controls/header/pagination, native accessible dialogs, unique field/error associations, persisted theme and readable semantic surfaces, breadcrumbs/skip link; guarded supplier/broker details; truthful stock/report/search failure states and history paging; correct versioned duplicate archival; authoritative purchase aggregates; granular actions; explicit receipt quantities and preserved edit/concurrency versions. Existing auth/cache isolation, API interceptors, PWA/mobile safe areas, label artwork/printing, exports and recovery workflows are retained. No production inventory write, migration or restore was performed.
+
+Latest full unit tests: **192 passed in 25 files**. The full Edge suite passed **261 tests**; a subsequent rebuilt route/workflow run passed **22 tests**, including 400 route/theme/viewport checks. Lint and production build passed. Final targeted permission checks and exact execution scope are recorded in the linked verification document. These scoped fixture checks do not assert that every production record/device/permission permutation has been certified.
+
+
+## Export Center UI verification (2026-10-11)
+
+`frontend/src/components/ExportCenter.tsx` extends the existing `/settings/backup` page and Settings/More navigation. It uses the established React Query/API client and styles, a responsive column grid, labeled inputs, loading/error/empty/retry/preparing/success states, disabled snapshot date/status controls, individual report actions and recent scoped history. `ExportControls.tsx` and Purchase Detail link into the report workflow; existing label printing is reused.
+
+This narrow UI contract is VERIFIED COMPLETE through `frontend/src/tests/ExportCenter.test.tsx`, report/download contracts and four `frontend/e2e/export-center.spec.ts` checks, including 390px and 1440px views, no horizontal page overflow, dates/status validation, server filenames and network-error recovery. The final related Edge run passed 62 checks across Export Center, operations/settings, barcode tools and database backups. API fixtures are mocked for browser tests; they are not production-data or hardware validation.
+
+The broader route-wide issues in the historical audit below are not claimed fixed by this export change. Physical devices/printers and the entire application's complete state/viewport matrix still need their declared qualification. See [EXPORT_SYSTEM.md](EXPORT_SYSTEM.md) for scope and [IMPLEMENTATION_AND_TEST_PLAN.md](IMPLEMENTATION_AND_TEST_PLAN.md) for actual test commands/results.
+
 ## Backup module follow-up (2026-10-10)
 
 `frontend/src/components/DatabaseBackupPanel.tsx` now extends the existing BackupPage with operator-only database recovery controls using the existing shell/classes/API/query cache. It handles loading, forbidden/error retry, empty history, active jobs, independent daily/monthly scheduling, storage/retention warnings, filename/time/size/stage, download/verify/protect/delete and explicit recovery confirmation. Ordinary business users retain exports and receive an explanation of platform-managed database recovery. Scope cache/remount and download scope checks are preserved.

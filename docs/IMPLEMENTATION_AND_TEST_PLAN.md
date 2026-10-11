@@ -1,5 +1,40 @@
 # Implementation and test plan
 
+## All-pages responsive implementation follow-up (2026-10-11)
+
+See [ALL_PAGES_RESPONSIVE_AUDIT.md](ALL_PAGES_RESPONSIVE_AUDIT.md) and [ALL_PAGES_RESPONSIVE_FIX_REPORT.md](ALL_PAGES_RESPONSIVE_FIX_REPORT.md) for the dependency-ordered work: single-render record cards and bounded comparison regions; all business modules/forms/settings; unchanged authorized workflows; eight-size light/dark route and dialog checks; populated receipt/model/report/import states; selection/history regressions; final lint/unit/production/browser evidence. Existing backend/export/barcode/backup changes and historical results below are preserved.
+
+## Frontend-wide improvement follow-up (2026-10-11)
+
+See [FRONTEND_UI_VERIFICATION.md](FRONTEND_UI_VERIFICATION.md) and [RESPONSIVE_UI_AUDIT.md](RESPONSIVE_UI_AUDIT.md) for the complete route/dialog inventory, findings, actual implementation and final execution evidence. The audit was completed before shared UI changes. Work proceeded in dependency order: shared controls/dialogs/theme/shell; correct links and permissions; truthful data/error/aggregate states; archive/receipt/edit integrity; viewport/workflow regressions and screenshot review.
+
+Added meaningful regressions for unique labels/error descriptions/focus/default button semantics/theme, versioned duplicate archival, stock failure recovery/paging, authoritative purchase aggregates and redaction, empty receipts/explicit remainder, edit preservation and original versions. The latest full unit run passed **192 tests in 25 files**; the full browser suite passed **261 tests** and the subsequent rebuilt route/workflow run passed **22 tests**. Lint and production build passed. The verification document records the exact scope, final targeted permission checks and 400 route/theme/viewport measurements. Browser fixtures are isolated and no production service/data/hardware operation was performed.
+
+Remaining release qualification: disposable live-backend interoperability and tenant/role configuration, physical scanner/printer/camera, actual mobile keyboards, assistive technology and additional browser engines, representative production-scale records/model/provider/recovery availability. No frontend change weakens server policies or substitutes fake production data. Earlier barcode/backup/export plans and test results below are preserved.
+
+
+## Export implementation and executed verification (2026-10-11)
+
+Export packages 2/6/7 from the historical dependency plan below are implemented within existing layers: 18 independent PDF/CSV/XLSX contracts, shared professional PDF renderer and styled spreadsheet writer, authorized Export Center/history, individual purchase PDF, and a common safe browser download path. This does not resolve the separate global Admin financial parity policy or unrelated page defects. See [EXPORT_SYSTEM.md](EXPORT_SYSTEM.md) and [PDF_EXPORT_MATRIX.md](PDF_EXPORT_MATRIX.md) for exact sources, semantics, dependencies, security and classifications.
+
+| Executed command/check | Actual result |
+|---|---|
+| `dotnet test backend/PurchaseAssistant.UnitTests/PurchaseAssistant.UnitTests.csproj -c Release --logger "trx;LogFileName=exports-final.trx"` | **703 passed, 0 failed, 0 skipped**. Actual HTTP authorization/content, all report formats/empty cases, trained forecast output, stock immutability, safe metadata, overpayment convention, large-data limits and PDF/XLSX/CSV rendering content. |
+| `scripts/run-postgres-integration-tests.ps1` | **79 passed, 0 failed, 0 skipped** in a newly initialized private disposable PostgreSQL cluster. Actual SQL projections/balances/totals, last UTC microsecond, transaction/audit sequence, existing migration/model, stock/barcode/backup regressions. No production migration or restore. |
+| `dotnet build backend/PurchaseAssistant.slnx -c Release --no-restore` | **PASS**, 0 warnings, 0 errors. |
+| `npm test` (frontend) | **171 tests / 22 files passed**. |
+| `npm run lint` (frontend) | **PASS**, no diagnostics. |
+| `npm run build` (frontend) | **PASS**, TypeScript and Vite production build. |
+| `npx playwright test e2e/export-center.spec.ts e2e/operations-settings.spec.ts e2e/barcode-tools.spec.ts e2e/database-backups.spec.ts` (frontend, headless Edge) | **62 passed**; Export Center 4, operations/settings 49, barcode tools 6, database backups 3. Browser UI uses mocked APIs; backend and database checks provide separate real content/security evidence. |
+| Independent synthetic output review | 21 PDFs, 40 pages rendered with Poppler and visually inspected; 18 XLSX read with openpyxl and 18 CSV parsed with Python csv. Content/typed values/Unicode/header counts/no-formulas checked; no clipped or overlapping text in inspected pages. |
+| `git diff --check` | **PASS**. Existing user changes preserved. |
+
+The final backend suite includes the latest supplementary-Unicode XLSX regression; Excel strings retain emoji and Malayalam as literal values. Financial balances clamp outstanding to the existing on-screen nonnegative convention without modifying old purchases. New export history uses SecurityAuditLogs; **no export schema migration is required**. Existing migrations/model validation executed only through guarded test fixtures.
+
+Test sources: `backend/PurchaseAssistant.UnitTests/AI/ReportExportEndpointTests.cs`, `Services/ReportFileBuilderTests.cs`, `backend/PurchaseAssistant.IntegrationTests/Stock/ReportExportIntegrationTests.cs`; frontend `src/tests/ReportExportApi.test.ts`, `ExportCenter.test.tsx`, `ExportContracts.test.ts`, `CsvExportButton.test.tsx` and the listed e2e files. Final TRX output is ignored at `backend/PurchaseAssistant.UnitTests/TestResults/exports-final.trx`; browser output is ignored at `frontend/test-results/`; synthetic files are ignored under `tmp/pdfs/export-qa/`. These are mutable local evidence, not deployable business reports.
+
+Dependency-ordered remaining work: qualify the actual Linux PDF/native image and real production ML model; qualify physical label printers/scanners separately; resolve Admin financial parity only with an explicit policy decision; define persisted historical stock/payment/commission contracts before adding such reports; add more PDF scripts or queued huge exports only with demonstrated requirements and corresponding content/security/load tests. No physical hardware, Linux runtime, production model, live recovery or deployment was certified here.
+
 ## Executed backup implementation verification — 2026-10-10
 
 The following results are from actual commands on the current working tree. Historical audit and barcode-only results below remain dated evidence. No production data, production migrations, live restore or deployment cutover was used.

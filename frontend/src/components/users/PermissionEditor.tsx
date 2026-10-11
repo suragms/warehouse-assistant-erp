@@ -1,3 +1,4 @@
+import { DialogFrame } from '../ui/DialogFrame';
 import React, { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, ALL_PERMISSIONS } from '../../api/usersApi';
@@ -16,7 +17,7 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
   const [granted, setGranted] = React.useState<Set<string>>(new Set());
   const [revoked, setRevoked] = React.useState<Set<string>>(new Set());
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['users', userId, 'permissions'],
     queryFn: () => usersApi.getPermissions(userId),
     staleTime: 0,
@@ -33,51 +34,11 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
     },
   });
 
-  // Calculate local optimistic state
-  const togglePermission = (key: string, isCurrentlyEnabled: boolean, isDefault: boolean) => {
-    if (isCurrentlyEnabled) {
-      if (isDefault) {
-        // We're disabling a default permission (revoke)
-        setRevoked(prev => {
-          const next = new Set(prev);
-          if (next.has(key)) next.delete(key); else next.add(key);
-          return next;
-        });
-        setGranted(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      } else {
-        // We're disabling a granted permission (remove from grant)
-        setGranted(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      }
-    } else {
-      if (isDefault) {
-        // We're enabling a default permission that was revoked (remove from revoke)
-        setRevoked(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      } else {
-        // We're enabling a new permission (grant)
-        setGranted(prev => {
-          const next = new Set(prev);
-          if (next.has(key)) next.delete(key); else next.add(key);
-          return next;
-        });
-        setRevoked(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      }
-    }
+  // Send changes relative to the loaded effective permissions, including existing overrides.
+  const togglePermission = (key: string, currentlyEnabled: boolean) => {
+    const enabled = !currentlyEnabled, baseEnabled = data?.permissions.includes(key) ?? false;
+    setGranted(previous => { const next = new Set(previous); if (enabled && !baseEnabled) next.add(key); else next.delete(key); return next; });
+    setRevoked(previous => { const next = new Set(previous); if (!enabled && baseEnabled) next.add(key); else next.delete(key); return next; });
   };
 
   const handleSave = () => {
@@ -99,15 +60,17 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
 
   const hasChanges = granted.size > 0 || revoked.size > 0;
 
+  const close = () => { if (!updateMutation.isPending && (!hasChanges || window.confirm('Discard changes?'))) onClose(); };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <DialogFrame open title="Manage Permissions" onClose={close} busy={updateMutation.isPending} className="max-w-2xl">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 max-h-[90dvh] flex flex-col">
         <div className="flex items-center justify-between border-b pb-3 shrink-0">
           <div>
             <h3 className="text-lg font-bold text-slate-900">Manage Permissions</h3>
             <p className="text-sm text-slate-500">Editing permissions for <span className="font-medium text-slate-800">{userName}</span></p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 rounded-lg p-2 transition-colors">
+          <button aria-label="Close permissions" onClick={close} disabled={updateMutation.isPending} className="text-slate-400 hover:text-slate-600 rounded-lg p-2 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -116,7 +79,7 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
           <div className="flex bg-red-50 p-4 rounded-lg my-4 text-red-700 items-start">
             <AlertCircle className="w-5 h-5 mr-3 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Failed to load permissions</p>
+              <p className="font-semibold" role="alert">Failed to load permissions</p><button className="underline py-2" onClick={() => void refetch()}>Retry permissions</button>
               <p className="text-sm mt-1">{purchaseErrorMessage(error)}</p>
             </div>
           </div>
@@ -171,27 +134,27 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
                     const isExplicitlyRevoked = revoked.has(p.key) || (!isBaseEnabled && isDefault && !granted.has(p.key));
 
                     return (
-                      <label
+                      <button type="button" role="switch" aria-checked={isCurrentlyEnabled} aria-label={p.label} disabled={updateMutation.isPending}
                         key={p.key}
                         className={cn(
-                          "flex flex-col p-2.5 rounded-lg border cursor-pointer select-none transition-all",
+                          "flex flex-col text-left p-2.5 rounded-lg border cursor-pointer select-none transition-all disabled:cursor-wait",
                           isCurrentlyEnabled
                             ? isExplicitlyGranted
-                              ? "bg-emerald-50/50 border-emerald-200 ring-1 ring-emerald-500"
+                              ? "bg-emerald-50 border-emerald-200 ring-1 ring-emerald-500"
                               : "bg-slate-50 border-slate-200 hover:border-slate-300"
                             : isExplicitlyRevoked
-                              ? "bg-red-50/50 border-red-100 opacity-75"
-                              : "bg-white border-slate-100 opacity-60 hover:opacity-100 hover:bg-slate-50"
+                              ? "bg-red-50 border-red-100"
+                              : "bg-white border-slate-200 hover:bg-slate-50"
                         )}
                         onClick={(e) => {
                           e.preventDefault();
-                          togglePermission(p.key, isCurrentlyEnabled, isDefault);
+                          togglePermission(p.key, isCurrentlyEnabled);
                         }}
                       >
                         <div className="flex items-center justify-between w-full">
                           <span className={cn(
                             "text-sm font-medium",
-                            isCurrentlyEnabled ? "text-slate-900" : "text-slate-500"
+                            isCurrentlyEnabled ? "text-slate-900" : "text-slate-600"
                           )}>
                             {p.label}
                           </span>
@@ -209,7 +172,7 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
                           </div>
                         </div>
                         <span className="text-[10px] text-slate-400 font-mono mt-1">{p.key}</span>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
@@ -221,10 +184,7 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
         <div className="flex justify-end gap-3 pt-4 border-t shrink-0">
           <button
             type="button"
-            onClick={() => {
-               if (hasChanges && !window.confirm('Discard changes?')) return;
-               onClose();
-            }}
+            onClick={close} disabled={updateMutation.isPending}
             className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 font-medium"
           >
             {hasChanges ? 'Cancel' : 'Close'}
@@ -252,6 +212,6 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
           </button>
         </div>
       </div>
-    </div>
+    </DialogFrame>
   );
 };

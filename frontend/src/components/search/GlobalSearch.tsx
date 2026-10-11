@@ -1,3 +1,4 @@
+import { DialogFrame } from '../ui/DialogFrame';
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -37,10 +38,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
   const navigate = useNavigate();
   const debouncedQuery = useDebounce(query, 300);
 
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isError, refetch } = useQuery({
     queryKey: searchKeys.global(debouncedQuery),
     queryFn: () => catalogApi.search(debouncedQuery),
-    enabled: debouncedQuery.trim().length >= 2,
+    enabled: open && debouncedQuery.trim().length >= 2,
     staleTime: 30_000,
   });
 
@@ -75,9 +76,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { onClose(); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min(c + 1, results.length - 1)); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.max(0, Math.min(c + 1, results.length - 1))); }
     if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
-    if (e.key === 'Enter' && results[cursor]) { navigate_to(results[cursor].path); }
+    if (e.key === 'Enter' && results[cursor]) { e.preventDefault(); navigate_to(results[cursor].path); }
   };
 
   const iconFor = (type: ResultType) => {
@@ -90,13 +91,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] bg-black/50 px-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Global search"
-    >
+    <DialogFrame open={open} title="Global search" onClose={onClose} className="max-w-xl">
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -115,10 +110,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
             onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Search items, suppliers, brokers, categories…"
-            className="flex-1 text-sm text-[#0F172A] placeholder-gray-400 outline-none bg-transparent"
+            className="min-w-0 flex-1 text-sm text-[#0F172A] placeholder-gray-400 outline-none bg-transparent"
+            role="combobox" aria-label="Search records" aria-expanded={results.length > 0} aria-activedescendant={results[cursor] ? `search-option-${cursor}` : undefined}
             aria-autocomplete="list"
             aria-controls="search-results"
           />
+          <button type="button" className="ui-icon-button" aria-label="Close search" onClick={onClose}><X className="h-5 w-5" /></button>
           {query && (
             <button onClick={() => setQuery('')} aria-label="Clear search">
               <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
@@ -132,7 +129,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
             <li className="py-10 text-center text-sm text-gray-400">
               Type at least 2 characters to search
             </li>
-          ) : results.length === 0 && !isFetching ? (
+          ) : isError ? (<li role="alert" className="p-4">Search could not be loaded. <button className="underline py-2" onClick={() => void refetch()}>Retry search</button></li>) : results.length === 0 && !isFetching ? (
             <li className="py-10 text-center text-sm text-gray-400">
               No matching records for "{debouncedQuery}"
             </li>
@@ -140,7 +137,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
             results.map((r, i) => (
               <li
                 key={`${r.type}-${r.id}`}
-                role="option"
+                id={`search-option-${i}`} role="option"
                 aria-selected={i === cursor}
                 className={cn(
                   'flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors',
@@ -167,6 +164,6 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
           <span>esc close</span>
         </div>
       </div>
-    </div>
+    </DialogFrame>
   );
 };

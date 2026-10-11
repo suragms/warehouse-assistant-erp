@@ -1,3 +1,4 @@
+import { ResponsiveRecords, RecordCard, RecordFields, DataTableScroll } from '../../components/ui/ResponsiveRecords';
 import { SafeImage } from '../../components/SafeImage';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -61,7 +62,7 @@ export default function BrokerList() {
       setDeleteOpen(false);
     },
     onError: (err: any) => {
-      showToast(err.normalized?.message || err.normalized === 'BROKER_IN_USE' ? 'Cannot delete broker that is linked to suppliers.' : 'Failed to delete', 'error');
+      showToast(err.normalized === 'BROKER_IN_USE' ? 'Cannot delete broker that is linked to suppliers.' : (err.normalized?.message || 'Failed to delete'), 'error');
       setDeleteOpen(false);
     }
   });
@@ -93,6 +94,15 @@ export default function BrokerList() {
     saveMutation.mutate({ name, isActive, imageUrl: imageUrl || undefined });
   };
 
+  const recordActions = (b: Broker) => <div className="flex flex-wrap items-center justify-end gap-2">
+{hasPermission(user, 'broker.edit') && <Button variant="ghost" size="sm" aria-label={`Edit ${b.name}`} onClick={() => handleOpenEdit(b)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>}
+                    {hasPermission(user, 'broker.delete') && <Button variant="ghost" size="sm" aria-label={`Delete ${b.name}`} className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setBrokerIdToDelete(b.id); setDeleteOpen(true); }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>}
+  </div>;
+
   return (
     <div>
       <PageHeader
@@ -109,7 +119,7 @@ export default function BrokerList() {
         <span className="py-2 text-sm">Page {page}</span>
         <Button variant="secondary" disabled={isLoading || !data || data.length < 50} onClick={() => setPage(p => p + 1)}>Next</Button>
       </div>
-      <Card className="overflow-x-auto">
+      <Card className="overflow-hidden">
         {isLoading ? (
           <div className="p-4 space-y-4">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
@@ -117,6 +127,14 @@ export default function BrokerList() {
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
         ) : (
+          <ResponsiveRecords label="Brokers" mobile={<div className="space-y-3">{data?.map(b => <RecordCard key={b.id} title={b.name} actions={recordActions(b)}>
+                <SafeImage src={b.imageUrl} alt={b.name} />
+                <RecordFields fields={[
+                  { label: 'Linked suppliers', value: b.linkedSuppliersCount },
+                  { label: 'Status', value: <Badge variant={b.isActive ? 'green' : 'gray'}>{b.isActive ? 'Active' : 'Inactive'}</Badge> },
+                ]} />
+              </RecordCard>)}{data?.length === 0 && <p className="p-4 text-center text-sm text-gray-500">No brokers found.</p>}</div>}>
+            <DataTableScroll label="Brokers table" minWidth="36rem">
           <table className="min-w-full text-sm text-left">
             <thead className="bg-gray-50 text-[#475569] font-medium border-b border-[#E2E8E6]">
               <tr>
@@ -134,13 +152,7 @@ export default function BrokerList() {
                   <td className="px-4 py-3">
                     {b.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}
                   </td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    {hasPermission(user, 'broker.edit') && <Button variant="ghost" size="sm" aria-label={`Edit ${b.name}`} onClick={() => handleOpenEdit(b)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>}
-                    {hasPermission(user, 'broker.delete') && <Button variant="ghost" size="sm" aria-label={`Delete ${b.name}`} className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setBrokerIdToDelete(b.id); setDeleteOpen(true); }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>}
+                  <td className="px-4 py-3 text-right space-x-2">{recordActions(b)}
                   </td>
                 </tr>
               ))}
@@ -153,6 +165,8 @@ export default function BrokerList() {
               )}
             </tbody>
           </table>
+            </DataTableScroll>
+          </ResponsiveRecords>
         )}
       </Card>
 
@@ -182,7 +196,7 @@ export default function BrokerList() {
             <label htmlFor="isActiveBroker" className="text-sm font-medium">Active</label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-wrap justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
             <Button type="submit" loading={saveMutation.isPending}>Save</Button>
           </div>

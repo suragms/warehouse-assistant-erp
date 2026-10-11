@@ -13,11 +13,11 @@ export function WhatsAppDelivery({ purchaseId }: { purchaseId: string }) {
     {query.isPending && <p role="status">Loading delivery status…</p>}{query.isError && <p role="alert">Delivery status could not be loaded. <button className="underline" onClick={() => void query.refetch()}>Retry</button></p>}
     {data && <><p className="text-sm">Send a PDF containing this purchase's item names, quantities and units to the configured staff number. The PDF excludes prices and totals.</p>
       {!data.ready && <p>Configure WhatsApp credentials in Settings and enable delivery on the server.</p>}
-      {data.recipient && <p className="break-all">Recipient: +{data.recipient}</p>}
+      {data.recipient && <p className="break-words">Recipient: +{data.recipient}</p>}
       {data.delivery && <p role="status">Status: {data.delivery.status} · Attempts: {data.delivery.attempts}{data.delivery.status === 'accepted' && ' · Accepted by Meta; recipient delivery has not been verified.'}</p>}
       {requiresVerification && <label className="flex gap-2 text-sm"><input type="checkbox" checked={verified} onChange={e => setVerified(e.target.checked)} />I verified in Meta that this message was not sent and want to retry.</label>}
       {data.delivery?.status === 'sending' && <button className="underline" onClick={() => void query.refetch()}>Refresh delivery status</button>}
-      {data.ready && data.eligible && data.delivery?.status !== 'accepted' && (data.delivery?.status !== 'sending' || requiresVerification) && <button className="bg-emerald-800 text-white rounded px-3 py-3 disabled:opacity-50" disabled={send.isPending || (requiresVerification && !verified)} onClick={() => { if (window.confirm(`Send this purchase quantity PDF to +${data.recipient}?`)) send.mutate(); }}>{send.isPending ? 'Sending…' : data.delivery ? 'Retry WhatsApp delivery' : 'Send purchase via WhatsApp'}</button>}
+      {data.ready && data.eligible && data.delivery?.status !== 'accepted' && (data.delivery?.status !== 'sending' || requiresVerification) && <button className="max-w-full whitespace-normal bg-emerald-800 text-white rounded px-3 py-3 disabled:opacity-50" disabled={send.isPending || (requiresVerification && !verified)} onClick={() => { if (window.confirm(`Send this purchase quantity PDF to +${data.recipient}?`)) send.mutate(); }}>{send.isPending ? 'Sending…' : data.delivery ? 'Retry WhatsApp delivery' : 'Send purchase via WhatsApp'}</button>}
     </>}{send.isError && <p role="alert" className="text-red-700">{purchaseErrorMessage(send.error)}</p>}
   </section>;
 }

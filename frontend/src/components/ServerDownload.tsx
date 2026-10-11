@@ -4,7 +4,7 @@ import { canExport } from '../api/exportsApi';
 export function ServerDownload({ path, filename, label, params }: { path: string; filename: string; label: string; params?: Record<string, unknown> }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   if (!canExport()) return null;
-  return <span className="inline-flex flex-col gap-1"><button className="border rounded px-3 py-3 bg-white disabled:opacity-50" disabled={busy} onClick={async () => {
+  return <span className="inline-flex flex-col gap-1 min-w-0 max-w-full"><button className="max-w-full whitespace-normal border rounded px-3 py-3 bg-white disabled:opacity-50" disabled={busy} onClick={async () => {
     setBusy(true); setError('');
     try {
       await downloadServerFile(path, filename, params);

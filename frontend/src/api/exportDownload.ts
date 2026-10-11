@@ -1,8 +1,8 @@
 import apiClient from './apiClient';
 import { useAuthStore } from '../stores/authStore';
 export function mayDownloadReports() {
- const business = useAuthStore.getState().user?.currentBusiness;
- return !!business && ['Owner', 'Admin', 'Manager', 'SuperAdmin'].includes(business.role) && (['Owner', 'Admin', 'SuperAdmin'].includes(business.role) || business.permissions.includes('reports.view'));
+ const session = useAuthStore.getState(), business = session.user?.currentBusiness;
+ return session.isAuthenticated && !!business && ['Owner', 'Admin', 'Manager', 'SuperAdmin'].includes(business.role) && (['Owner', 'Admin', 'SuperAdmin'].includes(business.role) || business.permissions.includes('reports.view'));
 }
 export function exportAccessScope() {
   const business = useAuthStore.getState().user?.currentBusiness;

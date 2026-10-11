@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import CatalogForm from '../pages/catalog/CatalogForm';
 import { catalogApi } from '../api/catalogApi';
+import { catalogKeys } from '../lib/queryKeys';
 import { ToastContext } from '../components/ui/toastContext';
 
 vi.mock('../api/catalogApi', () => ({ catalogApi: { getCategories: vi.fn(), getItemById: vi.fn(), createItem: vi.fn(), updateItem: vi.fn() } }));
@@ -18,6 +19,7 @@ const mount = (edit = false) => {
       <Route path="/catalog/items/:id" element={<p>Item saved</p>} />
     </Routes></ToastContext.Provider>
   </QueryClientProvider></MemoryRouter>);
+  return client;
 };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -54,4 +56,19 @@ it('edit shows duplicate barcode feedback and preserves unsaved input', async ()
   fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('reserved by another item');
   expect(screen.getByLabelText('Barcode')).toHaveValue('TAKEN');
+});
+
+it('retains a catalog edit and its original version when a background query refreshes', async () => {
+  const client = mount(true); const name = await screen.findByLabelText('Item Name *');
+  fireEvent.change(name, { target: { value: 'My unsaved name' } });
+  await act(async () => { client.setQueryData(catalogKeys.detail('c1'), { ...item, name: 'Another user name', rowVersion: 'v2' }); });
+  expect(name).toHaveValue('My unsaved name'); fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  await screen.findByText('Item saved'); expect(catalogApi.updateItem).toHaveBeenCalledWith('c1', expect.objectContaining({ name: 'My unsaved name', rowVersion: 'v1' }));
+});
+it('explicit conflict reload discards the draft and loads the current version', async () => {
+  vi.mocked(catalogApi.updateItem).mockRejectedValue({ response: { status: 409, data: { error: { code: 'CATALOG_ITEM_VERSION_CONFLICT' } } } });
+  mount(true); const name = await screen.findByLabelText('Item Name *'); fireEvent.change(name, { target: { value: 'My draft' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' })); await screen.findByRole('dialog', { name: 'Version Conflict' });
+  vi.mocked(catalogApi.getItemById).mockResolvedValue({ ...item, name: 'Latest name', rowVersion: 'v2' });
+  fireEvent.click(screen.getByRole('button', { name: 'Reload Latest' })); await waitFor(() => expect(screen.getByLabelText('Item Name *')).toHaveValue('Latest name'));
 });

@@ -52,11 +52,12 @@ public class ReportFileBuilderTests
     [Fact]
     public void SpreadsheetUsesTypedDatesDecimalsWidthsAndLiteralFormulaStrings()
     {
-        var bytes = ExportFileBuilder.ReportSpreadsheet([new("Date"), new("Amount INR", "money"), new("Item", Weight: 3)], [[new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc), 123.4567m, "  =HYPERLINK(\"danger\")\nമലയാളം"]]);
+        var bytes = ExportFileBuilder.ReportSpreadsheet([new("Date"), new("Amount INR", "money"), new("Item", Weight: 3)], [[new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc), 123.4567m, "  =HYPERLINK(\"danger\")\nമലയാളം 😊"]]);
         using var zip = new ZipArchive(new MemoryStream(bytes)); using var stream = zip.GetEntry("xl/worksheets/sheet1.xml")!.Open(); var document = XDocument.Load(stream);
         XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"; var row = document.Descendants(ns + "row").Last(); var cells = row.Elements(ns + "c").ToList();
         Assert.Equal("2", cells[0].Attribute("s")!.Value); Assert.NotNull(cells[0].Element(ns + "v")); Assert.Equal("3", cells[1].Attribute("s")!.Value); Assert.Equal("123.4567", cells[1].Element(ns + "v")!.Value);
         Assert.Equal("inlineStr", cells[2].Attribute("t")!.Value); Assert.Contains("=HYPERLINK", cells[2].Value); Assert.Empty(document.Descendants(ns + "f")); Assert.Equal(3, document.Descendants(ns + "col").Count());
+        Assert.Contains("😊", cells[2].Value); Assert.Contains("മലയാളം", cells[2].Value);
     }
     [Fact]
     public void CsvEscapesUnicodeNewlinesAndWhitespacePrefixedFormulasButPreservesNumericSigns()

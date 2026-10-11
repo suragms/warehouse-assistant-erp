@@ -52,9 +52,9 @@ export function NotificationBell() {
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', key); };
   }, [open]);
 
-  const handleNotificationClick = (n: NotificationDto) => {
+  const handleNotificationClick = async (n: NotificationDto) => {
     if (!n.isRead) {
-      markReadMutation.mutate(n.id);
+      try { await markReadMutation.mutateAsync(n.id); } catch { return; }
     }
     setOpenLocationKey(null);
     const target = notificationTarget(n); if (target) navigate(target);

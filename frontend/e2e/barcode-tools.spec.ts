@@ -61,3 +61,14 @@ for (const width of [390, 1440]) test(`versioned barcode assignment and batch pr
   await page.screenshot({ path: info.outputPath('batch-labels.png') });
   expect(calls.filter(c => /^(POST|PUT|PATCH|DELETE) \/(stock|purchases)/.test(c))).toEqual([]);
 });
+
+test('dark-theme barcode preview and print retain readable black-on-white artwork', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await navigationFixture(page, 'Staff');
+  await page.addInitScript(() => { localStorage.setItem('warehouse-theme', 'dark'); window.print = () => {}; });
+  await page.route('**/catalog/items/by-barcode?*', route => route.fulfill({ json: { id: 'c1', name: 'Rice മലയാളം', barcode: 'RICE-123456', itemCode: 'R1', isActive: true } }));
+  await page.goto('/catalog/barcodes'); await page.getByLabel('Scan or enter barcode').fill('RICE-123456'); await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const artwork = page.locator('.barcode-label-print').first(); await expect(artwork).toContainText('Rice മലയാളം'); await expect(artwork).toHaveCSS('color', 'rgb(0, 0, 0)'); await expect(artwork).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await page.getByRole('button', { name: 'Print barcode label / Save PDF' }).click(); await page.emulateMedia({ media: 'print' });
+  const printed = page.locator('.barcode-print-root .barcode-label-print'); await expect(printed).toBeVisible(); await expect(printed).toHaveCSS('color', 'rgb(0, 0, 0)'); await expect(printed).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  expect(await printed.locator('svg rect').count()).toBeGreaterThan(20);
+});

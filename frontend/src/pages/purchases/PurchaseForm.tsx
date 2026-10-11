@@ -1,3 +1,4 @@
+import { ErrorState } from '../../components/ui';
 import { formatMoney } from '../../lib/formatMoney';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +52,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
   const [draftLabels, setDraftLabels] = useState<Record<string, string>>({});
   const [draftSupplier, setDraftSupplier] = useState<{ id: string; name: string }>();
 
+  const [loadedVersion] = useState(existingOrder?.version);
   const [supplierId, setSupplierId] = useState(existingOrder?.supplierId ?? '');
   const [brokerId, setBrokerId] = useState(existingOrder?.brokerId || '');
   const [notes, setNotes] = useState(existingOrder?.notes || '');
@@ -68,17 +70,17 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
     kgPerUnit: i.kgPerUnit, landingCostPerKg: i.landingCostPerKg, notes: i.notes || ''
   })) ?? [{ catalogItemId: '', orderedQuantity: 1, unitPrice: 0, notes: '' }]);
 
-  const { data: suppliersData } = useQuery({
+  const { data: suppliersData, error: suppliersError, refetch: retrySuppliers } = useQuery({
     queryKey: ['suppliers', 'list'],
     queryFn: () => supplierApi.getSuppliers(1, 100),
   });
 
-  const { data: brokersData } = useQuery({
+  const { data: brokersData, error: brokersError, refetch: retryBrokers } = useQuery({
     queryKey: ['brokers', 'list'],
     queryFn: () => brokerApi.getBrokers(1, 100),
   });
 
-  const { data: catalogData } = useQuery({
+  const { data: catalogData, error: catalogError, refetch: retryCatalog } = useQuery({
     queryKey: ['catalog', 'list'],
     queryFn: () => catalogApi.getItems(1, 200),
   });
@@ -137,7 +139,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
   const buildDraftDto = (currentOrderNumber = orderNumber): UpsertPurchaseOrderDto => ({
     ...charges,
     ...(paymentDays !== '' ? { paymentDays: Number(paymentDays) } : {}),
-    expectedVersion: edit ? existingOrder?.version : undefined,
+    expectedVersion: edit ? loadedVersion : undefined,
     orderNumber: edit ? existingOrder?.orderNumber : currentOrderNumber,
     supplierId,
     brokerId: brokerId || undefined,
@@ -206,16 +208,19 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
 
   return (
     <div className="max-w-4xl min-w-0 mx-auto space-y-6 break-words">
-      <div className="flex items-center gap-4">
+      {suppliersError && <ErrorState message="Suppliers could not be loaded." onRetry={() => void retrySuppliers()} />}
+      {brokersError && <ErrorState message="Brokers could not be loaded." onRetry={() => void retryBrokers()} />}
+      {catalogError && <ErrorState message="Catalog items could not be loaded." onRetry={() => void retryCatalog()} />}
+      <div className="flex min-w-0 items-start gap-3">
         <button
-          onClick={() => navigate(-1)}
-          className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg border border-slate-200 shadow-sm transition-colors"
+          aria-label="Back to purchases" onClick={() => navigate(-1)}
+          className="shrink-0 p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg border border-slate-200 shadow-sm transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <ShoppingBag className="w-7 h-7 text-indigo-600" />
+            <ShoppingBag className="w-7 h-7 shrink-0 text-indigo-600" />
             {edit ? 'Edit Purchase Order' : 'Create Purchase Order'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -252,7 +257,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Broker (Optional)</label>
             <select
-              value={brokerId}
+              aria-label="Broker" value={brokerId}
               onChange={(e) => setBrokerId(e.target.value)}
               className="w-full min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
@@ -267,9 +272,9 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
             <label htmlFor="payment-days" className="block text-sm font-medium text-slate-700 mb-1">Payment terms (days)</label>
             <input id="payment-days" type="number" min="0" max="3650" step="1" value={paymentDays} onChange={e => setPaymentDays(e.target.value)}
               className="w-full mb-4 px-3 py-2 rounded-lg border border-slate-300" placeholder="Optional" />
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes / Terms</label>
+            <label htmlFor="purchase-notes" className="block text-sm font-medium text-slate-700 mb-1">Notes / Terms</label>
             <textarea
-              rows={2}
+              id="purchase-notes" aria-label="Purchase notes" rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Delivery instructions, payment terms, etc."
@@ -293,7 +298,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
 
           <div className="space-y-3">
             {items.map((item, index) => (
-              <div key={index} className="p-4 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div key={index} className="p-3 sm:p-4 min-w-0 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                 <div className="md:col-span-5">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Catalog Item *</label>
                   <select
@@ -311,9 +316,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
                   </select>
                 </div>
 
-                <div className="md:col-span-12 grid sm:grid-cols-3 gap-2">
-                  {(['freightAmount', 'deliveredCharge', 'billtyCharge'] as const).map(key => <label className="text-xs" key={key}>{{ freightAmount: 'Line freight (INR)', deliveredCharge: 'Line delivered charge (INR)', billtyCharge: 'Line billty charge (INR)' }[key]}<input type="number" min="0" step="0.01" className="block w-full border rounded p-2" value={item[key] ?? ''} onChange={e => handleItemChange(index, key, e.target.value === '' ? undefined : Number(e.target.value))} /></label>)}
-                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Qty *</label>
                   <input
@@ -351,6 +354,20 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
                     {preview ? formatMoney(preview.data.items[index]?.lineTotal) : 'Preview to view'}
                   </div>
                 </div>
+                <div className="md:col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={items.length === 1}
+                    aria-label={`Remove purchase item ${index + 1}`}
+                    onClick={() => handleRemoveItem(index)}
+                    className="p-2 text-slate-400 hover:text-rose-600 disabled:opacity-30 transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="md:col-span-12 grid sm:grid-cols-3 gap-2">
+                  {(['freightAmount', 'deliveredCharge', 'billtyCharge'] as const).map(key => <label className="text-xs" key={key}>{{ freightAmount: 'Line freight (INR)', deliveredCharge: 'Line delivered charge (INR)', billtyCharge: 'Line billty charge (INR)' }[key]}<input type="number" min="0" step="0.01" className="block w-full border rounded p-2" value={item[key] ?? ''} onChange={e => handleItemChange(index, key, e.target.value === '' ? undefined : Number(e.target.value))} /></label>)}
+                </div>
                 <div className="md:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="text-xs text-slate-600">Discount (%)
                     <input aria-label={`Discount percent ${index + 1}`} type="number" min="0" max="100" step="0.01"
@@ -379,31 +396,22 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
                     </label>
                   </div>
                 </details>
-                <div className="md:col-span-1 flex justify-end">
-                  <button
-                    type="button"
-                    disabled={items.length === 1}
-                    onClick={() => handleRemoveItem(index)}
-                    className="p-2 text-slate-400 hover:text-rose-600 disabled:opacity-30 transition-colors"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
+
               </div>
             ))}
           </div>
 
           {/* Totals Calculation */}
           <div className="pt-4 border-t border-slate-200 flex flex-col items-end space-y-2 text-sm">
-            <div className="flex justify-between w-full max-w-64">
+            <div className="flex flex-wrap gap-2 justify-between w-full max-w-64">
               <span className="text-slate-600">Subtotal:</span>
               <span className="font-medium text-slate-900">{preview ? formatMoney(preview.data.subtotal) : 'Preview to view'}</span>
             </div>
-            <div className="flex justify-between w-full max-w-64 items-center">
+            <div className="flex flex-wrap gap-2 justify-between w-full max-w-64 items-center">
               <span className="text-slate-600">Tax Total:</span>
               <span className="font-medium text-slate-900">{preview ? formatMoney(preview.data.taxTotal) : 'Preview to view'}</span>
             </div>
-            <div className="flex justify-between w-full max-w-64 text-base font-bold pt-2 border-t border-slate-200">
+            <div className="flex flex-wrap gap-2 justify-between w-full max-w-64 text-base font-bold pt-2 border-t border-slate-200">
               <span className="text-slate-900">Grand Total:</span>
               <span className="text-indigo-600">{preview ? formatMoney(preview.data.grandTotal) : 'Preview to view'}</span>
             </div>
@@ -422,7 +430,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
         <div className="flex flex-wrap justify-end gap-3">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            aria-label="Back to purchases" onClick={() => navigate(-1)}
             className="px-4 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
           >
             Cancel
@@ -430,9 +438,9 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
           <button
             type="submit"
             disabled={previewing || createMutation.isPending || updateMutation.isPending}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            className="max-w-full inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50"
           >
-            <Save className="w-4 h-4" />
+            <Save className="w-4 h-4 shrink-0" />
             {previewing ? 'Calculating preview…' : createMutation.isPending || updateMutation.isPending ? 'Saving…' : !preview ? 'Preview Purchase' : edit ? 'Update Purchase Order' : 'Create Purchase Order'}
           </button>
         </div>

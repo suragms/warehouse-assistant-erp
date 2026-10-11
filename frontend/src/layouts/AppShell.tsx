@@ -1,7 +1,9 @@
+import { Breadcrumbs } from '../components/Breadcrumbs';
+import { ThemeToggle } from '../components/ThemeProvider';
 import { RealtimeUpdates } from '../components/RealtimeUpdates';
 import { BackupReminder } from '../components/BackupReminder';
 import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Package, Users, Truck,
   ChevronDown, ChevronRight, LogOut, Search,
@@ -37,7 +39,7 @@ const navItems: NavItem[] = [
       { label: 'Categories', to: '/catalog/categories' },
       { label: 'Types', to: '/catalog/types' },
       { label: 'Barcodes', to: '/catalog/barcodes' },
-      { label: 'Duplicates', to: '/catalog/duplicates' },
+      { label: 'Duplicates', to: '/catalog/duplicates', permission: 'catalog.edit' },
     ]
   },
   { label: 'Suppliers', permission: 'supplier.view', icon: <Truck className="h-4 w-4" />, to: '/suppliers' },
@@ -63,13 +65,15 @@ const navItems: NavItem[] = [
 ];
 
 const SidebarNavItem: React.FC<{ item: NavItem; onNavigate?: () => void }> = ({ item, onNavigate }) => {
-  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const [expanded, setExpanded] = useState<boolean | null>(null);
+  const open = expanded ?? !!item.children?.some(child => location.pathname === child.to || location.pathname.startsWith(child.to + '/'));
 
   if (item.children) {
     return (
       <div>
         <button
-          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open} onClick={() => setExpanded(!open)}
           className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-[#E2E8E6] hover:bg-white/10 transition-colors"
         >
           <span className="flex items-center gap-2">
@@ -213,6 +217,7 @@ export const AppShell: React.FC = () => {
         <AppSidebar user={user} sessionBusy={sessionBusy} sessionError={sessionError} onSelectBusiness={selectBusiness} onLogout={handleLogout} />
       </div>
 
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
@@ -232,14 +237,15 @@ export const AppShell: React.FC = () => {
             </kbd>
           </button>
 
-          <div className="hidden md:flex ml-auto items-center gap-2">
-            <span className="hidden sm:block text-sm text-[#475569] font-medium">{user?.name}</span>
+          <div className="hidden md:flex ml-auto min-w-0 items-center gap-2">
+            <span title={user?.name} className="hidden sm:block max-w-40 truncate text-sm text-[#475569] font-medium">{user?.name}</span>
           </div>
+          <ThemeToggle />
         </header>
 
         {/* Page content */}
-        <main className="app-main flex-1 overflow-y-auto">
-          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
+        <main id="main-content" tabIndex={-1} className="app-main flex-1 min-w-0 min-h-0 overflow-y-auto">
+          <div className="app-content max-w-screen-2xl mx-auto px-4 sm:px-6 py-5">
             <React.Suspense
               fallback={
                 <div className="flex items-center justify-center py-24">
@@ -247,7 +253,7 @@ export const AppShell: React.FC = () => {
                 </div>
               }
             >
-              <BackupReminder key={`${user?.id ?? ''}:${user?.currentBusiness?.businessId ?? ''}`} /><Outlet />
+              <BackupReminder key={`${user?.id ?? ''}:${user?.currentBusiness?.businessId ?? ''}`} /><Breadcrumbs /><Outlet />
             </React.Suspense>
           </div>
         </main>

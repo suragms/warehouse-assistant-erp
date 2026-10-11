@@ -4,7 +4,7 @@ import { CsvExportButton } from '../components/CsvExportButton';
 import { useAuthStore } from '../stores/authStore';
 import { downloadCsv } from '../api/exportsApi';
 vi.mock('../api/exportsApi', async () => ({ ...await vi.importActual('../api/exportsApi'), downloadCsv: vi.fn() }));
-beforeEach(() => { vi.clearAllMocks(); useAuthStore.setState({ user: { id: 'u', name: 'Owner', email: 'owner@test.local', businesses: [], currentBusiness: { businessId: 'b', businessName: 'Business', role: 'Owner', permissions: [] } } }); });
+beforeEach(() => { vi.clearAllMocks(); useAuthStore.setState({ isAuthenticated: true, user: { id: 'u', name: 'Owner', email: 'owner@test.local', businesses: [], currentBusiness: { businessId: 'b', businessName: 'Business', role: 'Owner', permissions: [] } } }); });
 it('disables repeated downloads while pending and keeps an actionable failure', async () => {
   let reject!: (value: unknown) => void; vi.mocked(downloadCsv).mockReturnValue(new Promise((_, r) => { reject = r; }));
   render(<CsvExportButton kind="stock" label="Stock CSV" params={{ search: 'Rice' }} />); fireEvent.click(screen.getByRole('button')); expect(screen.getByRole('button')).toBeDisabled(); fireEvent.click(screen.getByRole('button')); expect(downloadCsv).toHaveBeenCalledTimes(1);

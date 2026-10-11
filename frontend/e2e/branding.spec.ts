@@ -88,7 +88,7 @@ for (const viewport of viewports) {
     if (viewport.width < 768) await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: 'Open search', exact: true }).filter({ visible: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByRole('dialog').getByRole('textbox')).toBeFocused();
+    await expect(page.getByRole('dialog').getByRole('combobox', { name: 'Search records' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).not.toBeVisible();
     if (viewport.width < 768) {

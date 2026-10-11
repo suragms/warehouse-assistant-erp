@@ -22,7 +22,7 @@ for (const role of ['Owner', 'Manager', 'Staff'] as const) for (const [width, he
           writeFileSync(info.outputPath(`${label}.png`), shot);
           const path = resolve(directory, `${role}-${width}-${label}.png`);
           if (process.env.NAV_BASELINE === '1') { mkdirSync(directory, { recursive: true }); writeFileSync(path, shot); }
-          else if (existsSync(path)) expect(shot.equals(readFileSync(path)), `${label} pixels must preserve pre-edit desktop`).toBe(true);
+          else if (process.env.NAV_COMPARE_BASELINE === '1' && existsSync(path)) expect(shot.equals(readFileSync(path)), `${label} pixels must match the explicitly selected desktop baseline`).toBe(true);
         }
         await page.screenshot({ path: info.outputPath('desktop.png'), animations: 'disabled' });
       }

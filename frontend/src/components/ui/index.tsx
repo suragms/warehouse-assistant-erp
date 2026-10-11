@@ -1,4 +1,5 @@
 import React from 'react';
+import { DialogFrame } from './DialogFrame';
 import { cn } from '../../lib/cn';
 
 // ── Button ─────────────────────────────────────────────────────────────────
@@ -18,13 +19,16 @@ export const Button: React.FC<ButtonProps> = ({
   className,
   children,
   disabled,
+  type = 'button',
   ...rest
 }) => (
   <button
     {...rest}
+    type={type}
+    aria-busy={loading || undefined}
     disabled={disabled || loading}
     className={cn(
-      'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+      'ui-button inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
       variant === 'primary' && 'bg-[#0E4F46] text-white hover:bg-[#065F4F] focus:ring-[#159A8A]',
       variant === 'secondary' && 'bg-white text-[#0E4F46] border border-[#0E4F46] hover:bg-[#F7F9F6] focus:ring-[#159A8A]',
       variant === 'ghost' && 'bg-transparent text-[#475569] hover:bg-gray-100 focus:ring-gray-300',
@@ -54,9 +58,9 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, className, id, ...rest }, ref) => {
-    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const generatedId = React.useId(); const inputId = id ?? generatedId;
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 min-w-0">
         {label && (
           <label htmlFor={inputId} className="text-sm font-medium text-[#0F172A]">
             {label}
@@ -70,16 +74,16 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             error ? 'border-red-400 focus:ring-red-400' : 'border-[#E2E8E6]',
             className
           )}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${inputId}-error` : undefined}
           {...rest}
+          aria-invalid={!!error}
+          aria-describedby={[rest['aria-describedby'], error && `${inputId}-error`, !error && hint && `${inputId}-hint`].filter(Boolean).join(' ') || undefined}
         />
         {error && (
           <p id={`${inputId}-error`} className="text-xs text-red-600" role="alert">
             {error}
           </p>
         )}
-        {!error && hint && <p className="text-xs text-gray-500">{hint}</p>}
+        {!error && hint && <p id={`${inputId}-hint`} className="text-xs text-gray-500">{hint}</p>}
       </div>
     );
   }
@@ -97,9 +101,9 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, options, placeholder, className, id, ...rest }, ref) => {
-    const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const generatedId = React.useId(); const selectId = id ?? generatedId;
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 min-w-0">
         {label && (
           <label htmlFor={selectId} className="text-sm font-medium text-[#0F172A]">
             {label}
@@ -113,8 +117,9 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             error ? 'border-red-400 focus:ring-red-400' : 'border-[#E2E8E6]',
             className
           )}
-          aria-invalid={!!error}
           {...rest}
+          aria-invalid={!!error}
+          aria-describedby={[rest['aria-describedby'], error && `${selectId}-error`].filter(Boolean).join(' ') || undefined}
         >
           {placeholder && <option value="">{placeholder}</option>}
           {options.map((o) => (
@@ -123,7 +128,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+        {error && <p id={`${selectId}-error`} className="text-xs text-red-600" role="alert">{error}</p>}
       </div>
     );
   }
@@ -139,9 +144,9 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ label, error, className, id, ...rest }, ref) => {
-    const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const generatedId = React.useId(); const textareaId = id ?? generatedId;
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 min-w-0">
         {label && (
           <label htmlFor={textareaId} className="text-sm font-medium text-[#0F172A]">
             {label}
@@ -157,8 +162,10 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             className
           )}
           {...rest}
+          aria-invalid={!!error}
+          aria-describedby={[rest['aria-describedby'], error && `${textareaId}-error`].filter(Boolean).join(' ') || undefined}
         />
-        {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+        {error && <p id={`${textareaId}-error`} className="text-xs text-red-600" role="alert">{error}</p>}
       </div>
     );
   }
@@ -198,7 +205,7 @@ export const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
 // ── Card ───────────────────────────────────────────────────────────────────
 
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
-  <div className={cn('bg-white rounded-xl border border-[#E2E8E6] shadow-sm', className)}>{children}</div>
+  <div className={cn('min-w-0 bg-white rounded-xl border border-[#E2E8E6] shadow-sm', className)}>{children}</div>
 );
 
 // ── ConfirmDialog ──────────────────────────────────────────────────────────
@@ -229,27 +236,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-title"
-    >
-      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-        <h2 id="confirm-title" className="text-lg font-semibold text-[#0F172A] mb-2">
-          {title}
-        </h2>
-        <p className="text-sm text-[#475569] mb-6">{description}</p>
-        <div className="flex gap-3 justify-end">
-          <Button variant="ghost" onClick={onCancel} disabled={loading}>
-            {cancelLabel}
-          </Button>
-          <Button variant={variant} onClick={onConfirm} loading={loading}>
-            {confirmLabel}
-          </Button>
+    <DialogFrame open={open} title={title} onClose={onCancel} busy={!!loading} className="max-w-sm">
+      <div className="p-5 space-y-4">
+        <h2 className="text-lg font-semibold text-[#0F172A] break-words">{title}</h2>
+        <p className="text-sm text-[#475569] break-words">{description}</p>
+        <div className="flex flex-wrap gap-3 justify-end">
+          <Button variant="ghost" onClick={onCancel} disabled={loading}>{cancelLabel}</Button>
+          <Button variant={variant} onClick={onConfirm} loading={loading}>{confirmLabel}</Button>
         </div>
       </div>
-    </div>
+    </DialogFrame>
   );
 };
 
@@ -266,35 +262,13 @@ interface ModalProps {
 export const Modal: React.FC<ModalProps> = ({ open, title, onClose, children, size = 'md' }) => {
   if (!open) return null;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-    >
-      <div
-        className={cn(
-          'bg-white rounded-xl shadow-xl w-full max-h-[90vh] overflow-y-auto',
-          size === 'sm' && 'max-w-sm',
-          size === 'md' && 'max-w-lg',
-          size === 'lg' && 'max-w-2xl'
-        )}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8E6]">
-          <h2 id="modal-title" className="text-lg font-semibold text-[#0F172A]">
-            {title}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-[#159A8A]"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="px-6 py-4">{children}</div>
+    <DialogFrame open={open} title={title} onClose={onClose} className={size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg'}>
+      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-[#E2E8E6]">
+        <h2 className="text-lg font-semibold text-[#0F172A] min-w-0 break-words">{title}</h2>
+        <button type="button" onClick={onClose} className="ui-icon-button shrink-0 text-gray-500 hover:text-gray-700" aria-label="Close"><X className="h-5 w-5" /></button>
       </div>
-    </div>
+      <div className="px-5 py-4 min-w-0">{children}</div>
+    </DialogFrame>
   );
 };
 
@@ -307,12 +281,12 @@ interface PageHeaderProps {
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, actions }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-    <div>
-      <h1 className="text-2xl font-bold text-[#0F172A]">{title}</h1>
+  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 min-w-0">
+    <div className="min-w-0">
+      <h1 className="text-2xl font-bold text-[#0F172A] break-words">{title}</h1>
       {subtitle && <p className="text-sm text-[#475569] mt-0.5">{subtitle}</p>}
     </div>
-    {actions && <div className="flex items-center gap-2">{actions}</div>}
+    {actions && <div className="flex flex-wrap items-center gap-2 min-w-0">{actions}</div>}
   </div>
 );
 
@@ -326,7 +300,7 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description, action }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
+  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
     {icon && <div className="text-gray-300 mb-4">{icon}</div>}
     <h3 className="text-base font-semibold text-[#0F172A] mb-1">{title}</h3>
     {description && <p className="text-sm text-[#475569] mb-4 max-w-sm">{description}</p>}
@@ -342,7 +316,7 @@ interface ErrorStateProps {
 }
 
 export const ErrorState: React.FC<ErrorStateProps> = ({ message = 'Something went wrong.', onRetry }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
+  <div role="alert" className="flex flex-col items-center justify-center py-10 px-4 text-center">
     <AlertCircle className="h-10 w-10 text-red-400 mb-3" />
     <p className="text-sm text-[#475569] mb-4">{message}</p>
     {onRetry && (
@@ -373,13 +347,13 @@ export const Pagination: React.FC<PaginationProps> = ({
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalCount);
   return (
-    <div className="flex items-center justify-between mt-4 text-sm text-[#475569]">
+    <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-sm text-[#475569]">
       <span>
         {totalCount === 0 ? 'No results' : `Showing ${start}–${end} of ${totalCount}`}
       </span>
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         <button
-          className="px-3 py-1 rounded border border-[#E2E8E6] hover:bg-gray-50 disabled:opacity-40"
+          className="ui-button px-3 py-1 rounded border border-[#E2E8E6] hover:bg-gray-50 disabled:opacity-40"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
           aria-label="Previous page"
@@ -393,7 +367,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             <button
               key={p}
               className={cn(
-                'px-3 py-1 rounded border',
+                'ui-button px-3 py-1 rounded border',
                 p === page
                   ? 'bg-[#0E4F46] text-white border-[#0E4F46]'
                   : 'border-[#E2E8E6] hover:bg-gray-50'
@@ -407,7 +381,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           );
         })}
         <button
-          className="px-3 py-1 rounded border border-[#E2E8E6] hover:bg-gray-50 disabled:opacity-40"
+          className="ui-button px-3 py-1 rounded border border-[#E2E8E6] hover:bg-gray-50 disabled:opacity-40"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
           aria-label="Next page"

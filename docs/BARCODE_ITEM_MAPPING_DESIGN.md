@@ -1,5 +1,11 @@
 # Barcode-to-item mapping: implemented design and verification
 
+## Export integration and retained label workflow (2026-10-11)
+
+Export Center links to Items and Barcode Manager for the existing independent and batch label flow. It exports saved barcodes in inventory/catalog reports; unassigned identifiers stay blank/unavailable. `frontend/src/components/BarcodeTools.tsx` (`BarcodeLabels`, `BarcodeLabel`) retains validated CODE128, human-readable names/values, browser Print/Save PDF and eligible selected-item batches. No duplicate server label generator or stock write was introduced.
+
+This browser label integration is VERIFIED COMPLETE for tested software behavior: the final Edge run includes all six `barcode-tools.spec.ts` cases and Export Center navigation. Physical scanner/printer output remains BLOCKED for hardware qualification; none was tested. Existing association permissions, tenant scope, validation and audit behavior below remain unchanged. Export code's balance/ledger immutability is independently covered by HTTP and PostgreSQL tests. See [EXPORT_SYSTEM.md](EXPORT_SYSTEM.md) for the report/format matrix and [IMPLEMENTATION_AND_TEST_PLAN.md](IMPLEMENTATION_AND_TEST_PLAN.md) for actual results.
+
 Implementation date: 2026-10-10. Repository baseline: `80ba7e9cd4f1cefa79b26417e568a26bf2a9b3c1`. This change reuses the existing catalog entity, tenant scope, authorization policies, audit pipeline and browser barcode tools. The other feature audits remain historical audit deliverables.
 
 ## Current implementation and classification

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-export type NavigationRole = 'Owner' | 'Manager' | 'Staff' | 'SuperAdmin';
+export type NavigationRole = 'Owner' | 'Admin' | 'Manager' | 'Staff' | 'SuperAdmin';
 // Matches the native role defaults, rather than granting every role all routes.
 export const rolePermissions = (role: NavigationRole) => role === 'Staff'
   ? ['catalog.view', 'supplier.view', 'broker.view', 'purchase.view', 'purchase.create', 'purchase.verify', 'purchase.damage_report', 'stock.view', 'stock.adjust', 'stock.physical']

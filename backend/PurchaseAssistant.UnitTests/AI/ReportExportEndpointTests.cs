@@ -117,6 +117,15 @@ public partial class PurchaseIntentEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/exports/reports/files/purchases.pdf?purchaseId={foreign.Id}")).StatusCode);
     }
     [Fact]
+    public async Task ReportExport_OutstandingBalanceMatchesOnScreenNonnegativeConvention()
+    {
+        using var factory = new Factory { MemberRole = Role.Owner }; using var client = factory.CreateClient(); await SeedExport(factory);
+        using (var scope = factory.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); var order = await db.Purchases.IgnoreQueryFilters().SingleAsync(); order.PaidAmount = 200m; await db.SaveChangesAsync(); }
+        client.DefaultRequestHeaders.Authorization = new("Bearer", Token("reports.view", true));
+        var text = await client.GetStringAsync("/api/v1/exports/reports/files/supplier-purchases.csv");
+        Assert.Contains("123.4567,200,0", text); Assert.DoesNotContain("-76.5433", text);
+    }
+    [Fact]
     public async Task ReportExport_LargeCatalogReturnsLimitErrorInsteadOfTruncatingAndHistoryIsPersonal()
     {
         using var factory = new Factory { MemberRole = Role.Owner }; using var client = factory.CreateClient(); client.DefaultRequestHeaders.Authorization = new("Bearer", Token("reports.view", true));

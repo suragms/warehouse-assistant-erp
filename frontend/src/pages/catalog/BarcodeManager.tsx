@@ -69,7 +69,7 @@ export default function BarcodeManager() {
         <div className="flex flex-col gap-6">
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Lookup Barcode</h2>
-            <div className="flex gap-3 items-end">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
               <div className="flex-1 min-w-0">
                 <Input
                   ref={inputRef}
@@ -116,7 +116,7 @@ export default function BarcodeManager() {
                   <p className="text-sm text-red-600 mb-5 max-w-sm">
                     This barcode is not assigned to any item
                   </p>
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap justify-center gap-3">
                     <Button variant="secondary" onClick={handleTryAgain}>Try Again</Button>
                     {hasPermission(user, 'catalog.create') && <Link to="/catalog/items/new">
                       <Button icon={<Plus className="h-4 w-4"/>}>Create New Item</Button>
@@ -125,18 +125,18 @@ export default function BarcodeManager() {
                 </Card>
               ) : data ? (
                 <Card className="p-6 flex flex-col gap-4 border-emerald-200 bg-emerald-50/30">
-                  <div className="flex justify-between items-start">
+                  <div className="flex flex-wrap justify-between items-start gap-3">
                     <div>
-                      <h3 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-[#0F172A] flex min-w-0 items-start gap-2">
                         {data.name}
-                        <CheckCircle className="h-5 w-5 text-emerald-500" />
+                        <CheckCircle className="shrink-0 h-5 w-5 text-emerald-500" />
                       </h3>
                       <p className="text-sm text-gray-600 font-mono mt-1 break-all">Barcode: {data.barcode}</p>
                     </div>
                     {data.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="red">Archived</Badge>}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-2">
                     <div>
                       <span className="text-gray-500 block mb-1">Item Code</span>
                       <span className="font-medium text-[#0F172A]">{data.itemCode}</span>
@@ -205,8 +205,8 @@ export default function BarcodeManager() {
                               }}
                               className="w-full text-left px-3 py-2 hover:bg-gray-50 cursor-pointer flex flex-col"
                             >
-                              <span className="font-medium text-sm text-[#0F172A] truncate">{item.name}</span>
-                              <span className="text-xs text-gray-500">
+                              <span className="min-w-0 break-words font-medium text-sm text-[#0F172A]">{item.name}</span>
+                              <span className="break-words text-xs text-gray-500">
                                 Code: {item.itemCode} | Barcode: {item.barcode || 'None'}
                               </span>
                             </button></li>

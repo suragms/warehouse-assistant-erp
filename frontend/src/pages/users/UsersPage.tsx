@@ -1,3 +1,5 @@
+import { ResponsiveRecords, RecordCard, RecordFields, DataTableScroll } from '../../components/ui/ResponsiveRecords';
+import { DialogFrame } from '../../components/ui/DialogFrame';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, type UserDto, type CreateUserDto, type UpdateUserDto } from '../../api/usersApi';
@@ -188,102 +190,8 @@ export default function UsersPage() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <PageHeader
-          title="User Management"
-          subtitle="Manage workspace users, roles, security policies, and permissions."
-        />
-        {canManage && <button
-          onClick={() => {
-            createMutation.reset();
-            setFormData({ name: '', email: '', password: '', role: defaultRole });
-            setIsCreateOpen(true);
-          }}
-          className="inline-flex items-center justify-center gap-2 bg-[#0E4F46] hover:bg-[#0E4F46]/90 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Add User
-        </button>}
-      </div>
-
-      {mutationError && <p role="alert" className="text-red-700 break-words">{purchaseErrorMessage(mutationError)}</p>}
-      
-      {/* Users table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {isLoading ? (
-          <div className="p-12 text-center text-slate-500">Loading workspace users...</div>
-        ) : error ? (
-          <div className="p-12 text-center text-red-500 flex flex-col items-center gap-2">
-            <AlertCircle className="w-8 h-8" />
-            <p>Failed to load users. Ensure you have proper permissions.</p>
-            <button onClick={() => void queryClient.invalidateQueries({ queryKey: userKeys.all })}>Retry</button>
-          </div>
-        ) : !users || users.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">No users found in this workspace.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4">User</th>
-                  <th className="py-3 px-4">Role</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Created At</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/75 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#0E4F46]/10 text-[#0E4F46] flex items-center justify-center font-bold text-sm">
-                          {u.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">{u.name}</p>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                            <Mail className="w-3 h-3 text-slate-400" />
-                            <span>{u.email}</span>
-                            <button
-                              onClick={() => void copyText(u.email, `email-${u.id}`)}
-                              className="text-slate-400 hover:text-[#0E4F46] p-0.5 rounded transition-colors inline-flex items-center"
-                              title="Copy Email"
-                            >
-                              {copiedField === `email-${u.id}` ? (
-                                <Check className="w-3 h-3 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        <Shield className="w-3 h-3" />
-                        {getRoleName(u.role)}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {u.status === 0 ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                          <CheckCircle2 className="w-3 h-3" /> Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                          <Ban className="w-3 h-3" /> {USER_STATUSES.find(s => s.value === u.status)?.label ?? "Unavailable"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500 text-xs">
-                      {new Date(u.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-3.5 px-4 text-right space-x-1.5">
-                      {/* Share / Copy credentials button for every user */}
+  const userActions = (u: UserDto) => <div className="flex flex-wrap justify-end gap-2">
+{/* Share / Copy credentials button for every user */}
                       <button
                         onClick={() => {
                           setShowPassword(false);
@@ -336,22 +244,132 @@ export default function UsersPage() {
                           </button>
                         </>
                       )}
+  </div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <PageHeader
+          title="User Management"
+          subtitle="Manage workspace users, roles, security policies, and permissions."
+        />
+        {canManage && <button
+          onClick={() => {
+            createMutation.reset();
+            setFormData({ name: '', email: '', password: '', role: defaultRole });
+            setIsCreateOpen(true);
+          }}
+          className="inline-flex items-center justify-center gap-2 bg-[#0E4F46] hover:bg-[#0E4F46]/90 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Add User
+        </button>}
+      </div>
+
+      {mutationError && <p role="alert" className="text-red-700 break-words">{purchaseErrorMessage(mutationError)}</p>}
+      
+      {/* Users table */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 sm:p-12 text-center text-slate-500">Loading workspace users...</div>
+        ) : error ? (
+          <div className="p-6 sm:p-12 text-center text-red-500 flex flex-col items-center gap-2">
+            <AlertCircle className="w-8 h-8" />
+            <p>Failed to load users. Ensure you have proper permissions.</p>
+            <button onClick={() => void queryClient.invalidateQueries({ queryKey: userKeys.all })}>Retry</button>
+          </div>
+        ) : !users || users.length === 0 ? (
+          <div className="p-6 sm:p-12 text-center text-slate-500">No users found in this workspace.</div>
+        ) : (
+          <ResponsiveRecords label="Workspace users" mobile={<div className="space-y-3">
+            {users.map(u => <RecordCard key={u.id} title={u.name} subtitle={u.email} actions={userActions(u)}>
+              <RecordFields fields={[
+                { label: 'Role', value: <span className="text-indigo-700">{getRoleName(u.role)}</span> },
+                { label: 'Status', value: u.status === 0 ? 'Active' : USER_STATUSES.find(s => s.value === u.status)?.label ?? 'Unavailable' },
+                { label: 'Created', value: new Date(u.createdAt).toLocaleDateString() },
+              ]} />
+              <button type="button" className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm text-[#0E4F46]" onClick={() => void copyText(u.email, `email-${u.id}`)}>
+                {copiedField === `email-${u.id}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copy email
+              </button>
+            </RecordCard>)}
+          </div>}>
+            <DataTableScroll label="Workspace users table" minWidth="56rem">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3 px-4">User</th>
+                  <th className="py-3 px-4">Role</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Created At</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50/75 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#0E4F46]/10 text-[#0E4F46] flex items-center justify-center font-bold text-sm">
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{u.name}</p>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Mail className="w-3 h-3 text-slate-400" />
+                            <span>{u.email}</span>
+                            <button
+                              onClick={() => void copyText(u.email, `email-${u.id}`)}
+                              className="text-slate-400 hover:text-[#0E4F46] p-0.5 rounded transition-colors inline-flex items-center"
+                              title="Copy Email" aria-label={`Copy email for ${u.name}`}
+                            >
+                              {copiedField === `email-${u.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                        <Shield className="w-3 h-3" />
+                        {getRoleName(u.role)}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {u.status === 0 ? (
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                          <Ban className="w-3 h-3" /> {USER_STATUSES.find(s => s.value === u.status)?.label ?? "Unavailable"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-500 text-xs">
+                      {new Date(u.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-right space-x-1.5">{userActions(u)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+            </DataTableScroll>
+          </ResponsiveRecords>
         )}
       </div>
 
       {/* Create User Modal */}
       {isCreateOpen && canManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
+        <DialogFrame open busy={createMutation.isPending} title="Add New User" onClose={() => setIsCreateOpen(false)} className="max-w-md">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-lg font-bold text-slate-900">Add New User</h3>
-              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button aria-label="Close create user" disabled={createMutation.isPending} onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -400,7 +418,7 @@ export default function UsersPage() {
                   {assignableRoles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t">
+              <div className="flex flex-wrap justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
@@ -418,16 +436,16 @@ export default function UsersPage() {
               </div>
             </form>
           </div>
-        </div>
+        </DialogFrame>
       )}
 
       {/* Edit User Modal */}
       {editingUser && canManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
+        <DialogFrame open busy={updateMutation.isPending} title="Edit User" onClose={() => setEditingUser(null)} className="max-w-md">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-4 sm:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-lg font-bold text-slate-900">Edit User</h3>
-              <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600">
+              <button aria-label="Close edit user" disabled={updateMutation.isPending} onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -474,7 +492,7 @@ export default function UsersPage() {
                   <option value={2}>Blocked</option>
                 </select>
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t">
+              <div className="flex flex-wrap justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
@@ -492,16 +510,16 @@ export default function UsersPage() {
               </div>
             </form>
           </div>
-        </div>
+        </DialogFrame>
       )}
 
       {/* Copy / Share Credentials Modal */}
       {sharedCredentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <DialogFrame open title="Login credentials" onClose={() => { setSharedCredentials(null); setShowPassword(false); }} className="max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${sharedCredentials.isNewCreation ? 'bg-emerald-100 text-[#0E4F46]' : 'bg-teal-100 text-teal-800'}`}>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${sharedCredentials.isNewCreation ? 'bg-emerald-100 text-[#0E4F46]' : 'bg-teal-100 text-teal-800'}`}>
                   {sharedCredentials.isNewCreation ? <CheckCircle2 className="w-6 h-6" /> : <Key className="w-6 h-6" />}
                 </div>
                 <div>
@@ -516,7 +534,7 @@ export default function UsersPage() {
                 </div>
               </div>
               <button
-                onClick={() => setSharedCredentials(null)}
+                aria-label="Close credentials" onClick={() => { setSharedCredentials(null); setShowPassword(false); }}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -525,24 +543,24 @@ export default function UsersPage() {
 
             {/* Credential Details Card */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:items-center text-xs pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Workspace</span>
-                <span className="font-semibold text-slate-800">{sharedCredentials.businessName}</span>
+                <span className="min-w-0 max-w-full break-words font-semibold text-slate-800">{sharedCredentials.businessName}</span>
               </div>
 
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:items-center text-xs pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Full Name</span>
-                <span className="font-semibold text-slate-800">{sharedCredentials.name}</span>
+                <span className="min-w-0 max-w-full break-words font-semibold text-slate-800">{sharedCredentials.name}</span>
               </div>
 
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:items-center text-xs pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Email Address</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-slate-800 font-medium">{sharedCredentials.email}</span>
+                <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                  <span className="min-w-0 break-words font-mono text-slate-800 font-medium">{sharedCredentials.email}</span>
                   <button
                     onClick={() => void copyText(sharedCredentials.email, 'cred-email')}
                     className="p-1 text-slate-400 hover:text-[#0E4F46] rounded transition-colors"
-                    title="Copy Email"
+                    title="Copy Email" aria-label={`Copy email for ${sharedCredentials.name}`}
                   >
                     {copiedField === 'cred-email' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -550,10 +568,10 @@ export default function UsersPage() {
               </div>
 
               {sharedCredentials.password && (
-                <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:items-center text-xs pb-2 border-b border-slate-200">
                   <span className="text-slate-500 font-medium">Password</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 font-semibold text-slate-900">
+                  <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                    <span className="min-w-0 break-words font-mono bg-white px-2 py-0.5 rounded border border-slate-200 font-semibold text-slate-900">
                       {showPassword ? sharedCredentials.password : '••••••••••••'}
                     </span>
                     <button
@@ -575,7 +593,7 @@ export default function UsersPage() {
                 </div>
               )}
 
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-200">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:items-center text-xs pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Assigned Role</span>
                 <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">
                   <Shield className="w-3 h-3" />
@@ -583,10 +601,10 @@ export default function UsersPage() {
                 </span>
               </div>
 
-              <div className="flex justify-between items-center text-xs">
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:items-center text-xs">
                 <span className="text-slate-500 font-medium">Login URL</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-slate-600 truncate max-w-[180px]">{sharedCredentials.loginUrl}</span>
+                <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                  <span className="min-w-0 break-words font-mono text-slate-600">{sharedCredentials.loginUrl}</span>
                   <button
                     onClick={() => void copyText(sharedCredentials.loginUrl, 'cred-url')}
                     className="p-1 text-slate-400 hover:text-[#0E4F46] rounded transition-colors"
@@ -617,7 +635,7 @@ export default function UsersPage() {
                 )}
               </button>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleShareWhatsApp(sharedCredentials)}
@@ -641,14 +659,14 @@ export default function UsersPage() {
             <div className="pt-2 text-center">
               <button
                 type="button"
-                onClick={() => setSharedCredentials(null)}
+                aria-label="Close credentials" onClick={() => { setSharedCredentials(null); setShowPassword(false); }}
                 className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
               >
                 Done
               </button>
             </div>
           </div>
-        </div>
+        </DialogFrame>
       )}
 
       {/* Permissions Editor */}

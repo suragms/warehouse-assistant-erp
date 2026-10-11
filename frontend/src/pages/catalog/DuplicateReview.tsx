@@ -1,3 +1,5 @@
+import { hasPermission } from '../../auth/hasPermission';
+import { invalidateBarcodeQueries } from '../../lib/barcodes';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -24,7 +26,7 @@ export default function DuplicateReview() {
   const { showToast } = useToast();
   const user = useAuthStore((s) => s.user);
 
-  const hasArchivePermission = user?.currentBusiness?.permissions?.includes('catalog.archive') ?? false;
+  const hasArchivePermission = hasPermission(user, 'catalog.archive');
 
   const {
     data: duplicates,
@@ -40,9 +42,11 @@ export default function DuplicateReview() {
   const candidateList: DuplicateCandidate[] = Array.isArray(duplicates) ? duplicates : ((duplicates as any)?.data ?? []);
 
   const archiveMutation = useMutation({
-    mutationFn: (id: string) => catalogApi.deleteItem(id),
+    mutationFn: async (id: string) => { if (!hasArchivePermission) throw new Error('Archive access is unavailable.'); const current = await catalogApi.getItemById(id); return catalogApi.archiveItem(id, current.rowVersion); },
     onSuccess: () => {
       showToast('Item archived successfully');
+      void invalidateBarcodeQueries(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['search'] });
       queryClient.invalidateQueries({ queryKey: duplicateKeys.list(threshold) });
       queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
       setItemToArchive(null);
@@ -71,7 +75,7 @@ export default function DuplicateReview() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-700">Threshold:</span>
             <Select
-              value={threshold.toString()}
+              aria-label="Similarity threshold" value={threshold.toString()}
               onChange={(e) => setThreshold(Number(e.target.value))}
               options={[
                 { value: '50', label: '50%' },
@@ -121,7 +125,7 @@ export default function DuplicateReview() {
             <Card key={`${pair.itemAId}-${pair.itemBId}`} className="p-4 sm:p-6">
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Item A */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0 break-words">
                   <div className="flex items-center mb-2">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Item A</span>
                   </div>
@@ -150,7 +154,7 @@ export default function DuplicateReview() {
                 </div>
 
                 {/* Item B */}
-                <div className="flex-1 lg:pt-0 pt-4 lg:border-t-0 border-t">
+                <div className="flex-1 min-w-0 break-words lg:pt-0 pt-4 lg:border-t-0 border-t">
                   <div className="flex items-center mb-2">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Item B</span>
                   </div>

@@ -1,26 +1,31 @@
+import { ErrorState } from '../../components/ui';
+import { useAuthStore } from '../../stores/authStore';
+import { hasPermission } from '../../auth/hasPermission';
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, TrendingUp, ClipboardList, RefreshCw, Clock } from 'lucide-react';
 import { stockApi } from '../../api/stockApi';
 import type { AdjustStockRequest, UpdatePhysicalStockRequest, ReconcileStockRequest } from '../../api/stockApi';
-import { stockKeys } from '../../lib/queryKeys';
+import { catalogKeys, dashboardKeys, reportKeys, stockKeys } from '../../lib/queryKeys';
 import { useToast } from '../../components/ui/toastContext';
 import axios from 'axios';
 
 export default function StockDetail() {
   const { id } = useParams<{ id: string }>();
+  const user = useAuthStore(s => s.user);
   const qc = useQueryClient();
   const { showToast } = useToast();
   const [activeForm, setActiveForm] = useState<'adjust' | 'physical' | 'reconcile' | null>(null);
 
-  const { data: item, isLoading } = useQuery({
+  const { data: item, isLoading, error, refetch } = useQuery({
     queryKey: stockKeys.detail(id!),
     queryFn: () => stockApi.getDetail(id!),
     enabled: !!id,
   });
 
   const invalidate = () => {
+    for (const key of [catalogKeys.all, dashboardKeys.all, reportKeys.all, ['barcode']]) void qc.invalidateQueries({ queryKey: key });
     qc.invalidateQueries({ queryKey: stockKeys.detail(id!) });
     qc.invalidateQueries({ queryKey: stockKeys.lists() });
     qc.invalidateQueries({ queryKey: stockKeys.lowStock() });
@@ -30,7 +35,7 @@ export default function StockDetail() {
 
   const handleConflict = (err: unknown) => {
     if (axios.isAxiosError(err) && err.response?.status === 409) {
-      const code = err.response?.data?.error;
+      const code = typeof err.response?.data?.error === 'string' ? err.response.data.error : err.response?.data?.error?.code;
       if (code === 'STOCK_VERSION_CONFLICT') {
         showToast('Stock was updated by another session. Reloading latest data…', 'error');
         qc.invalidateQueries({ queryKey: stockKeys.detail(id!) });
@@ -72,6 +77,7 @@ export default function StockDetail() {
     );
   }
 
+  if (error) return <ErrorState message={axios.isAxiosError(error) && error.response?.status === 404 ? 'Item not found.' : 'Stock details could not be loaded.'} onRetry={() => void refetch()} />;
   if (!item) {
     return (
       <div className="text-center py-16 text-gray-400">
@@ -88,7 +94,7 @@ export default function StockDetail() {
   const variance = item.physicalStock - item.systemStock;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 min-w-0 max-w-3xl break-words">
       {/* Header */}
       <div>
         <Link
@@ -112,7 +118,7 @@ export default function StockDetail() {
       </div>
 
       {/* Stock summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <StatCard label="System Stock" value={item.systemStock} unit={item.defaultUnit} />
         <StatCard label="Physical Stock" value={item.physicalStock} unit={item.defaultUnit} />
         <StatCard label="Reserved" value={item.reservedStock} unit={item.defaultUnit} />
@@ -136,21 +142,21 @@ export default function StockDetail() {
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3">
-        <ActionButton
+        {hasPermission(user, 'stock.adjust') && <ActionButton
           active={activeForm === 'adjust'}
           onClick={() => setActiveForm(activeForm === 'adjust' ? null : 'adjust')}
           icon={<TrendingUp className="h-4 w-4" />}
           label="Adjust Stock"
           color="blue"
-        />
-        <ActionButton
+        />}
+        {hasPermission(user, 'stock.physical') && <ActionButton
           active={activeForm === 'physical'}
           onClick={() => setActiveForm(activeForm === 'physical' ? null : 'physical')}
           icon={<ClipboardList className="h-4 w-4" />}
           label="Record Physical Count"
           color="teal"
-        />
-        <ActionButton
+        />}
+        {hasPermission(user, 'stock.system') && <ActionButton
           active={activeForm === 'reconcile'}
           onClick={() => setActiveForm(activeForm === 'reconcile' ? null : 'reconcile')}
           icon={<RefreshCw className="h-4 w-4" />}
@@ -158,11 +164,11 @@ export default function StockDetail() {
           color="amber"
           disabled={variance === 0}
           title={variance === 0 ? 'No variance to reconcile' : undefined}
-        />
+        />}
       </div>
 
       {/* Forms */}
-      {activeForm === 'adjust' && (
+      {activeForm === 'adjust' && hasPermission(user, 'stock.adjust') && (
         <AdjustForm
           unit={item.defaultUnit}
           availableStock={item.availableStock}
@@ -172,7 +178,7 @@ export default function StockDetail() {
           onCancel={() => setActiveForm(null)}
         />
       )}
-      {activeForm === 'physical' && (
+      {activeForm === 'physical' && hasPermission(user, 'stock.physical') && (
         <PhysicalForm
           unit={item.defaultUnit}
           currentPhysical={item.physicalStock}
@@ -182,7 +188,7 @@ export default function StockDetail() {
           onCancel={() => setActiveForm(null)}
         />
       )}
-      {activeForm === 'reconcile' && (
+      {activeForm === 'reconcile' && hasPermission(user, 'stock.system') && (
         <ReconcileForm
           unit={item.defaultUnit}
           systemStock={item.systemStock}
@@ -213,9 +219,9 @@ function StatCard({
     highlight === 'warn' ? 'text-amber-600' :
     'text-[#0E4F46]';
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="bg-white min-w-0 border border-gray-200 rounded-xl p-3 sm:p-4">
       <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${textColor}`}>{value}</p>
+      <p className={`text-2xl break-words font-bold ${textColor}`}>{value}</p>
       <p className="text-xs text-gray-400">{unit}</p>
     </div>
   );
@@ -252,7 +258,7 @@ function ActionButton({
 
 function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+    <div className="bg-white min-w-0 border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4">
       <h3 className="font-semibold text-gray-800">{title}</h3>
       {children}
     </div>
@@ -266,10 +272,10 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="block text-sm text-gray-600 mb-1">{label}</label>
+    <label className="block">
+      <span className="block text-sm text-gray-600 mb-1">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
@@ -303,7 +309,7 @@ function AdjustForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField label={`Quantity Delta (positive to add, negative to remove) — available: ${availableStock} ${unit}`}>
           <input
-            type="number"
+            aria-label="Quantity delta" type="number"
             step="any"
             value={delta}
             onChange={e => setDelta(e.target.value)}
@@ -313,12 +319,12 @@ function AdjustForm({
           />
         </FormField>
         <FormField label="Reason">
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Required" required maxLength={500} />
+          <input aria-label="Reason" type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Required" required maxLength={500} />
         </FormField>
         <FormField label="Notes">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
+          <textarea aria-label="Notes" value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
         </FormField>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             type="submit"
             disabled={!valid || isPending}
@@ -363,7 +369,7 @@ function PhysicalForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField label={`Counted Quantity (${unit})`}>
           <input
-            type="number"
+            aria-label="Physical stock count" type="number"
             step="any"
             min="0"
             value={physical}
@@ -373,12 +379,12 @@ function PhysicalForm({
           />
         </FormField>
         <FormField label="Reason">
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" maxLength={500} />
+          <input aria-label="Reason" type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" maxLength={500} />
         </FormField>
         <FormField label="Notes">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
+          <textarea aria-label="Notes" value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
         </FormField>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             type="submit"
             disabled={!valid || isPending}
@@ -426,12 +432,12 @@ function ReconcileForm({
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField label="Reason">
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" maxLength={500} />
+          <input aria-label="Reason" type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" maxLength={500} />
         </FormField>
         <FormField label="Notes">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
+          <textarea aria-label="Notes" value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
         </FormField>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             type="submit"
             disabled={isPending}

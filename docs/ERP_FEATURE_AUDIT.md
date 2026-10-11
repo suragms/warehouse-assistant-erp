@@ -1,5 +1,18 @@
 # ERP feature audit
 
+## Export implementation follow-up (2026-10-11)
+
+The report software contract is now implemented and verified. The older audit tables below describe the 2026-10-10 baseline, not current export coverage. See [EXPORT_SYSTEM.md](EXPORT_SYSTEM.md) for each report's sources, filters, policies, calculations, dependencies, security implications, evidence and remaining gaps.
+
+| Feature | Current classification and concrete evidence |
+|---|---|
+| Export Center and independent reports | VERIFIED COMPLETE for the bounded contract: 18 individual reports in PDF/CSV/XLSX, server-authorized catalog, applicable UTC period/status filters, per-user/business generation history. `ExportsController.Reports.cs`, `ExportCenter.tsx`; endpoint, frontend and Edge checks. |
+| PDF foundation and machine files | VERIFIED COMPLETE for covered fonts/data: measured tables, repeating headings/page counts, wrapped long rows, clear empty text; styled typed XLSX and safe UTF-8 CSV. `ExportFileBuilder.Reports.cs`; extracted content, independent file readers and 40-page visual review. Arbitrary-script PDF is PARTIAL with an explicit CSV/XLSX fallback. |
+| Download security and permissions | VERIFIED COMPLETE for current file contracts: shared `exportDownload.ts` rejects delayed bytes after identity/business/role/permission changes. Resource and tenant enforcement stays server-side; financial files remain Owner/SuperAdmin. Original E02 global Admin parity remains PARTIAL pending a separate policy decision. |
+| Unsupported capabilities | Historical stock/valuation, dated payment and broker commission ledgers remain MISSING. Native save dialog has no browser-shell implementation. Production models, Linux PDF native assets and physical hardware qualification remain BLOCKED externally. No fictitious report data was added. |
+
+No export migration is required; export history reuses immutable SecurityAuditLogs. Existing barcode/recovery work and user changes were preserved; stock and historical records are read-only during exports. Actual final commands and results are in [IMPLEMENTATION_AND_TEST_PLAN.md](IMPLEMENTATION_AND_TEST_PLAN.md).
+
 ## Implementation follow-up: database recovery (2026-10-10)
 
 The baseline below remains historical. The current working tree now implements the production-oriented database backup module: durable manual/daily/monthly jobs, consistent encrypted native PostgreSQL archives, platform-only policies, retention, verification and guided isolated recovery. K03/K04's tested module behavior is VERIFIED COMPLETE; production cutover and external recovery dependencies remain BLOCKED pending deployment qualification. Existing JSON/PDF/XLSX extracts are retained and remain PARTIAL as recovery artifacts. See [BACKUP_RESTORE_DESIGN.md](BACKUP_RESTORE_DESIGN.md) for source paths, dependencies, security, tests, remaining limitations and configuration, and [RECOVERY_DRILL.md](RECOVERY_DRILL.md) for the actual recovery procedure. No production migration or restore was executed; prior barcode work is preserved.

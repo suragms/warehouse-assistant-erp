@@ -1,5 +1,28 @@
 # PDF and desktop export matrix
 
+## Implemented export matrix (2026-10-11)
+
+This section supersedes the PDF/export proposals below. Those tables remain historical findings. Current source/permission/filter/calculation/test details for all 18 reports are in [EXPORT_SYSTEM.md](EXPORT_SYSTEM.md).
+
+| Requested capability | Current independent report actions | Classification / limits |
+|---|---|---|
+| Inventory/catalog | `catalog` PDF/CSV/XLSX | VERIFIED COMPLETE; saved identifiers, active/all/inactive. |
+| Stock/valuation | `stock`, `valuation` PDF/CSV/XLSX | VERIFIED COMPLETE for current saved balances and existing service estimates; historical values MISSING. |
+| Reorder | `low-stock` PDF/CSV/XLSX | VERIFIED COMPLETE for existing available > 0 and <= reorder rule; out-of-stock excluded. |
+| Movements/audit | `movements`, `audit` PDF/CSV/XLSX | VERIFIED COMPLETE for saved movements and secret-safe audit event index; raw audit descriptions excluded. |
+| Purchases | `purchases` PDF/CSV/XLSX; Purchase Detail PDF | VERIFIED COMPLETE; eligibility and individual actual status declared, quantity-only projections for restricted roles. |
+| Summary/spend | `purchase-summary`, `spend`, `comparison` PDF/CSV/XLSX | VERIFIED COMPLETE against existing report services; financial file policy retained. |
+| Supplier/broker | `suppliers`, `supplier-purchases`, `brokers` PDF/CSV/XLSX | VERIFIED COMPLETE for directories/saved purchase balances; dated payment/commission ledgers MISSING. |
+| Delivery/lifecycle | `delivery` PDF/CSV/XLSX | VERIFIED COMPLETE for real saved lifecycle timestamps, including missing values. |
+| Dashboard/operations | `dashboard` PDF/CSV/XLSX | VERIFIED COMPLETE for existing dashboard metrics; no invented generic daily-operations report. |
+| Barcode/catalog labels | Existing Items/Barcode Manager independent/batch browser Print/Save PDF | VERIFIED COMPLETE software flow; physical print qualification BLOCKED. |
+| Backup status/history | `backup-history`, `database-backups` PDF/CSV/XLSX | VERIFIED COMPLETE for metadata only; tenant export history and restricted platform recovery are separate. |
+| Forecast/analytics | `forecast`, `comparison` plus purchase analytics | VERIFIED COMPLETE for real ready-model output; production model qualification BLOCKED. |
+
+PDFs reuse SkiaSharp with embedded licensed Noto fonts and HarfBuzz shaping. Each has business/title/generation time/UTC period/filter notes, repeated table headings, page counts, wrapping, row continuation and empty text; 21 synthetic PDFs/40 pages were visually checked. Font coverage beyond the bundled scripts remains PARTIAL with a clear CSV/XLSX fallback. XLSX retains typed values and a separate metadata sheet; CSV is UTF-8, correctly escaped and formula-safe. See the implementation document for actual memory/input budgets.
+
+All new report formats apply current-user tenant identity, existing report/resource policies and Owner/SuperAdmin financial file restrictions before generation. New routes use `/api/v1/exports/reports/files/{report}.{format}`, preserving legacy URLs. The existing `purchases.pdf` uses the shared renderer; legacy formats remain available. Browser download helpers now reject stale identity/business/role/permission responses, and financial CSV buttons match their actual server permission. Global Admin JSON/file policy parity remains a separate unresolved policy contract. No Electron/Tauri exists; native save dialogs were not fabricated.
+
 ## Database backup follow-up (2026-10-10)
 
 Native `.wab` recovery archives and encrypted `.wabevent` operator events are separate from PDF/XLSX/CSV/ZIP reports. Existing report exporters and libraries are retained. Database recovery lives in `PostgresBackupEngine`, `DatabaseBackupService`, `DatabaseBackupsController` and the existing BackupPage; it does not convert reports into restorables or introduce PDF dependencies. See [BACKUP_RESTORE_DESIGN.md](BACKUP_RESTORE_DESIGN.md). Historical export/PDF gaps below remain their prior classifications.

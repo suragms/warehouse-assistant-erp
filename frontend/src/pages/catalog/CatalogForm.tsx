@@ -49,14 +49,14 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
 
   const [conflictDialogOpen, setConflictDialogOpen] = React.useState(false);
 
-  const { data: item, isLoading: isLoadingItem, error: itemError } = useQuery({
+  const { data: item, isLoading: isLoadingItem, error: itemError, refetch: retryItem } = useQuery({
     queryKey: catalogKeys.detail(id!),
     queryFn: () => catalogApi.getItemById(id!),
     enabled: edit && !!id,
     staleTime: 0,
   });
 
-  const { data: categories } = useQuery({
+  const { data: categories, error: categoriesError, refetch: retryCategories } = useQuery({
     queryKey: categoryKeys.lists(),
     queryFn: () => catalogApi.getCategories(),
   });
@@ -68,7 +68,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
     setValue,
     reset,
     setError,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting, isDirty }
   } = useForm<ItemFormValues>({
     defaultValues: {
       name: '',
@@ -87,7 +87,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   const selectedCategoryId = useWatch({ control, name: 'categoryId' });
   const selectedTypeId = useWatch({ control, name: 'typeId' });
 
-  const { data: types } = useQuery({
+  const { data: types, error: typesError, refetch: retryTypes } = useQuery({
     queryKey: ['categories', selectedCategoryId, 'types'],
     queryFn: async () => {
       const res = await import('../../api/apiClient').then(m => m.default.get(`/catalog/categories/${selectedCategoryId}/types`));
@@ -97,7 +97,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   });
 
   useEffect(() => {
-    if (edit && item) {
+    if (edit && item && !isDirty) {
       reset({
         name: item.name,
         itemCode: item.itemCode,
@@ -111,7 +111,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
         rowVersion: item.rowVersion || '',
       });
     }
-  }, [edit, item, reset]);
+  }, [edit, item, reset, isDirty]);
 
   // Clear type when category changes to an incompatible one
   useEffect(() => {
@@ -149,15 +149,17 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
       showToast(edit ? 'Item updated successfully' : 'Item created successfully', 'success');
       navigate(edit ? `/catalog/items/${id}` : `/catalog/items/${res.id}`);
     },
-    onError: (err: { normalized?: string | { message?: string }; response?: { data?: { error?: string } } }) => {
+    onError: (err: { normalized?: string | { message?: string }; response?: { data?: { error?: string | { code?: string } } } }) => {
       const msg = typeof err.normalized === 'string' ? err.normalized : err.normalized?.message;
-      if (err.response?.data?.error === 'DUPLICATE_BARCODE') {
+      const bodyError = err.response?.data?.error;
+      const code = typeof bodyError === 'string' ? bodyError : bodyError?.code ?? msg;
+      if (code === 'DUPLICATE_BARCODE') {
         setError('barcode', { type: 'manual', message: barcodeError(err) });
-      } else if (msg === 'DUPLICATE_ITEM_CODE_OR_BARCODE') {
+      } else if (code === 'DUPLICATE_ITEM_CODE_OR_BARCODE') {
         setError('itemCode', { type: 'manual', message: 'Item code or barcode already exists.' });
         setError('barcode', { type: 'manual', message: 'If barcode is provided, it might be a duplicate.' });
         showToast('Duplicate identifier detected. Please check item code and barcode.', 'error');
-      } else if (msg === 'CATALOG_ITEM_VERSION_CONFLICT') {
+      } else if (code === 'CATALOG_ITEM_VERSION_CONFLICT') {
         setConflictDialogOpen(true);
       } else {
         showToast('Failed to save item', 'error');
@@ -180,6 +182,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
 
   const handleConflictReload = () => {
     setConflictDialogOpen(false);
+    reset();
     queryClient.invalidateQueries({ queryKey: catalogKeys.detail(id!) });
   };
 
@@ -188,7 +191,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   }
 
   if (edit && itemError) {
-    return <ErrorState message="Could not load item." onRetry={() => navigate('/catalog/items')} />;
+    return <ErrorState message="Could not load item." onRetry={() => void retryItem()} />;
   }
 
   return (
@@ -205,6 +208,8 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
         subtitle="Enter item details for the master catalog"
       />
 
+      {categoriesError && <ErrorState message="Categories could not be loaded." onRetry={() => void retryCategories()} />}
+      {typesError && <ErrorState message="Types could not be loaded." onRetry={() => void retryTypes()} />}
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card className="p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -299,7 +304,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
           </div>
         </Card>
 
-        <div className="flex justify-end gap-3 sticky bottom-4 bg-[#F7F9F6] p-4 rounded-xl border border-[#E2E8E6] shadow-sm">
+        <div className="flex flex-wrap justify-end gap-3 sm:sticky sm:bottom-4 bg-[#F7F9F6] p-4 rounded-xl border border-[#E2E8E6] shadow-sm">
           <Link to={edit ? `/catalog/items/${id}` : "/catalog/items"}>
             <Button type="button" variant="ghost" disabled={isSubmitting || mutation.isPending}>Cancel</Button>
           </Link>

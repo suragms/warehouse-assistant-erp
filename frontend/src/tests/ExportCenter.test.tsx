@@ -15,7 +15,7 @@ const reports: ReportDefinition[] = [
 ];
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.setState({ user: { id: 'u', name: 'Owner', email: 'owner@example.test', businesses: [], currentBusiness: { businessId: 'b', businessName: 'Business', role: 'Owner', permissions: [] } } });
+  useAuthStore.setState({ isAuthenticated: true, user: { id: 'u', name: 'Owner', email: 'owner@example.test', businesses: [], currentBusiness: { businessId: 'b', businessName: 'Business', role: 'Owner', permissions: [] } } });
   vi.mocked(reportExportsApi.catalog).mockResolvedValue({ reports, timezone: 'UTC', maxRows: 5000, missingCapabilities: ['Historical balances unavailable.'] });
   vi.mocked(reportExportsApi.history).mockResolvedValue({ items: [] }); vi.mocked(reportExportsApi.download).mockResolvedValue();
   vi.mocked(mlApi.items).mockResolvedValue({ items: [{ id: 'i1', name: 'Café rice', itemCode: 'R1', unit: 'KG' }], totalCount: 1 });

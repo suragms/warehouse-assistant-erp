@@ -1,5 +1,11 @@
 # Comprehensive backup and restore design
 
+## Report export integration (2026-10-11)
+
+Export Center is integrated into the existing BackupPage. `ExportsController.Reports.cs` now provides separate PDF/CSV/XLSX reports for tenant `BackupLogs` (business JSON export runs) and operator `DatabaseBackupJobs` (native platform recovery status). These narrowly defined report contracts are VERIFIED COMPLETE through three-format content and permission tests; no path, error, credential, key, hash or archive content is included. Database status still requires `RequireDatabaseBackup`, and its title explicitly states platform scope across all businesses.
+
+`ExportCenter.tsx` also shows the current user's latest 50 content-free `SecurityAuditLogs` generation events for the selected business. This is report history, not a durable report queue or proof of browser saving. The existing JSON/ZIP and recovery formats remain separate. Exports neither restore nor change backup records. The module needs no new schema migration. See [EXPORT_SYSTEM.md](EXPORT_SYSTEM.md) for contracts, dependencies, policies and tests, and [IMPLEMENTATION_AND_TEST_PLAN.md](IMPLEMENTATION_AND_TEST_PLAN.md) for executed results. The older recovery design below retains its scope.
+
 ## Implemented recovery module — 2026-10-10
 
 This section describes the current working tree and supersedes the historical backup gaps below. Prior barcode work and audit documents were preserved. No production database, migration, restore or cutover was executed. The database recovery feature remains disabled until deployment configuration is supplied.

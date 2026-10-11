@@ -6,7 +6,7 @@ import type { PurchaseOrderDto } from '../api/purchaseApi';
 vi.mock('../api/apiClient', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 const row = { orderNumber: '=unsafe', supplierName: 'Supplier, "quoted"', createdAt: '2026-10-02T00:00:00Z', grandTotal: 10.25, remainingAmount: 7.35, status: 1 } as PurchaseOrderDto;
 beforeEach(() => {
-  vi.clearAllMocks(); localStorage.clear(); useAuthStore.setState({ user: { id: 'u1', name: 'Owner', email: 'owner@example.test', businesses: [], currentBusiness: { businessId: 'a', businessName: 'A', role: 'Owner', permissions: [] } } });
+  vi.clearAllMocks(); localStorage.clear(); useAuthStore.setState({ isAuthenticated: true, user: { id: 'u1', name: 'Owner', email: 'owner@example.test', businesses: [], currentBusiness: { businessId: 'a', businessName: 'A', role: 'Owner', permissions: [] } } });
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:test') }); Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 });

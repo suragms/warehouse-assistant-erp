@@ -1,3 +1,4 @@
+import { ErrorState, Skeleton } from '../../components/ui';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,17 +7,17 @@ import { stockApi } from '../../api/stockApi';
 import { stockKeys } from '../../lib/queryKeys';
 
 export default function StockDashboard() {
-  const { data: allStock } = useQuery({
+  const { data: allStock, isPending: allPending, isError: allError, refetch: retryAll } = useQuery({
     queryKey: stockKeys.list({ page: 1, pageSize: 1 }),
     queryFn: () => stockApi.getItems(1, 1),
   });
 
-  const { data: lowStock } = useQuery({
+  const { data: lowStock, isPending: lowPending, isError: lowError, refetch: retryLow } = useQuery({
     queryKey: stockKeys.lowStock({ page: 1, pageSize: 5 }),
     queryFn: () => stockApi.getLowStock(1, 5),
   });
 
-  const { data: outOfStock } = useQuery({
+  const { data: outOfStock, isPending: outPending, isError: outError, refetch: retryOut } = useQuery({
     queryKey: stockKeys.outOfStock({ page: 1, pageSize: 5 }),
     queryFn: () => stockApi.getOutOfStock(1, 5),
   });
@@ -28,7 +29,7 @@ export default function StockDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#0E4F46]">Stock Overview</h1>
+        <h1 className="text-2xl break-words font-bold text-[#0E4F46]">Stock Overview</h1>
         <p className="text-sm text-gray-500 mt-1">Current inventory status across all items</p>
       </div>
 
@@ -36,14 +37,14 @@ export default function StockDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <SummaryCard
           label="Total Items"
-          value={totalItems}
+          value={allPending || allError ? undefined : totalItems}
           icon={<Package className="h-5 w-5 text-[#0E4F46]" />}
           bg="bg-[#E8F5F3]"
           linkTo="/inventory/all"
         />
         <SummaryCard
           label="Low Stock"
-          value={lowCount}
+          value={lowPending || lowError ? undefined : lowCount}
           icon={<AlertTriangle className="h-5 w-5 text-amber-600" />}
           bg="bg-amber-50"
           linkTo="/inventory/low-stock"
@@ -51,7 +52,7 @@ export default function StockDashboard() {
         />
         <SummaryCard
           label="Out of Stock"
-          value={outCount}
+          value={outPending || outError ? undefined : outCount}
           icon={<PackageX className="h-5 w-5 text-red-500" />}
           bg="bg-red-50"
           linkTo="/inventory/out-of-stock"
@@ -59,6 +60,10 @@ export default function StockDashboard() {
         />
       </div>
 
+      {(allPending || lowPending || outPending) && <div role="status" aria-label="Loading stock counts"><Skeleton className="h-16" /></div>}
+      {allError && <ErrorState message="Total stock count could not be loaded." onRetry={() => void retryAll()} />}
+      {lowError && <ErrorState message="Low-stock alerts could not be loaded." onRetry={() => void retryLow()} />}
+      {outError && <ErrorState message="Out-of-stock alerts could not be loaded." onRetry={() => void retryOut()} />}
       {/* Alerts */}
       {outCount > 0 && (
         <AlertSection
@@ -86,7 +91,7 @@ function SummaryCard({
   label, value, icon, bg, linkTo, warn, danger
 }: {
   label: string;
-  value: number;
+  value?: number;
   icon: React.ReactNode;
   bg: string;
   linkTo: string;
@@ -96,13 +101,13 @@ function SummaryCard({
   return (
     <Link
       to={linkTo}
-      className={`flex items-center gap-4 rounded-xl border p-4 hover:shadow-md transition-shadow ${
+      className={`flex min-w-0 flex-wrap items-center gap-3 rounded-xl border p-4 hover:shadow-md transition-shadow ${
         danger ? 'border-red-200 bg-red-50' : warn ? 'border-amber-200 bg-amber-50' : 'border-[#C7E0DC] bg-[#E8F5F3]'
       }`}
     >
       <div className={`p-2 rounded-lg ${bg}`}>{icon}</div>
       <div>
-        <p className="text-2xl font-bold text-[#0E4F46]">{value}</p>
+        <p className="text-2xl break-words font-bold text-[#0E4F46]">{value ?? 'Unavailable'}</p>
         <p className="text-sm text-gray-500">{label}</p>
       </div>
     </Link>
@@ -124,7 +129,7 @@ function AlertSection({
 
   return (
     <div className={`rounded-xl border ${borderColor} overflow-hidden`}>
-      <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
+      <div className={`flex flex-wrap gap-3 items-center justify-between px-4 py-3 ${headerBg}`}>
         <span className={`font-semibold text-sm ${titleColor}`}>{title} ({totalCount})</span>
         <Link to={linkTo} className={`text-xs flex items-center gap-1 ${titleColor} hover:underline`}>
           View all <ArrowRight className="h-3 w-3" />
@@ -135,10 +140,10 @@ function AlertSection({
           <Link
             key={item.id}
             to={`/inventory/${item.id}`}
-            className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
           >
             <div>
-              <p className="text-sm font-medium text-gray-900">{item.name}</p>
+              <p className="text-sm break-words font-medium text-gray-900">{item.name}</p>
               <p className="text-xs text-gray-400">{item.itemCode}</p>
             </div>
             <div className="text-right">

@@ -35,15 +35,15 @@ export default function NotificationsPage() {
   const notifications = data?.data || [];
   const meta = data?.meta;
 
-  const handleItemClick = (n: NotificationDto) => {
+  const handleItemClick = async (n: NotificationDto) => {
     if (!n.isRead) {
-      markReadMutation.mutate(n.id);
+      try { await markReadMutation.mutateAsync(n.id); } catch { return; }
     }
     const target = notificationTarget(n); if (target) navigate(target);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <PageHeader
           title="Notifications & Alerts"
@@ -62,8 +62,8 @@ export default function NotificationsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <Filter className="w-4 h-4 text-slate-400" />
           <span className="text-sm font-medium text-slate-700">Filter:</span>
           <button
@@ -108,7 +108,7 @@ export default function NotificationsPage() {
               <button type="button" disabled={markReadMutation.isPending}
                 key={n.id}
                 onClick={() => handleItemClick(n)}
-                className={`w-full text-left p-4 sm:p-5 hover:bg-slate-50 cursor-pointer transition-colors flex items-start gap-4 ${
+                className={`w-full text-left p-4 sm:p-5 hover:bg-slate-50 cursor-pointer transition-colors grid grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 sm:gap-4 ${
                   !n.isRead ? 'bg-indigo-50/30' : ''
                 }`}
               >
@@ -117,12 +117,12 @@ export default function NotificationsPage() {
                     !n.isRead ? 'bg-indigo-600 ring-4 ring-indigo-100' : 'bg-slate-300'
                   }`}
                 />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className={`text-sm text-slate-900 ${!n.isRead ? 'font-bold' : 'font-semibold'}`}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <h4 className={`text-sm text-slate-900 break-words ${!n.isRead ? 'font-bold' : 'font-semibold'}`}>
                       {n.title}
                     </h4>
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded-full uppercase tracking-wider">
+                    <span className="max-w-full break-words px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded-full uppercase tracking-wider">
                       {n.type}
                     </span>
                   </div>
@@ -132,7 +132,7 @@ export default function NotificationsPage() {
                   </p>
                 </div>
                 {notificationTarget(n) && (
-                  <div className="flex items-center gap-1 text-indigo-600 text-xs font-semibold self-center">
+                  <div className="col-start-2 sm:col-start-3 flex items-center gap-1 text-indigo-600 text-xs font-semibold sm:self-center">
                     <span>View</span>
                     <ExternalLink className="w-4 h-4" />
                   </div>
@@ -144,11 +144,11 @@ export default function NotificationsPage() {
 
         {/* Pagination */}
         {meta && meta.totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 flex items-center justify-between text-sm text-slate-500">
+          <div className="p-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
             <span>
               Page {meta.page} of {meta.totalPages} ({meta.totalCount} total)
             </span>
-            <div className="space-x-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}

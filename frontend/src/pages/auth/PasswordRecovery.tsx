@@ -1,3 +1,4 @@
+import { ThemeToggle } from '../../components/ThemeProvider';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
@@ -31,8 +32,8 @@ export default function PasswordRecovery({ reset = false }: { reset?: boolean })
     } finally { setBusy(false); }
   };
   const field = 'block w-full border rounded p-3 mt-1';
-  return <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4"><section className="bg-white border rounded-xl p-6 w-full max-w-md space-y-4">
-    <BrandLogo /><h1 className="text-xl font-semibold">{reset ? 'Choose a new password' : 'Reset your password'}</h1>
+  return <main className="auth-page min-h-screen min-h-[100svh] bg-slate-50 flex items-center justify-center p-4"><section className="bg-white border rounded-xl p-6 w-full max-w-md space-y-4">
+    <div className="flex justify-between items-center"><BrandLogo /><ThemeToggle /></div><h1 className="text-xl font-semibold">{reset ? 'Choose a new password' : 'Reset your password'}</h1>
     <p className="text-sm">{reset ? 'Changing your password signs out your existing sessions on all devices.' : 'Enter your account email. If recovery is enabled and the account is eligible, instructions will be queued.'}</p>
     {message ? <p role="status">{message}</p> : reset && !token ? <p role="alert">This reset link is missing or has expired. Request a new link.</p> : <form className="space-y-4" onSubmit={submit}>
       <label className="block">Email<input className={field} type="email" autoComplete="email" required maxLength={255} value={email} disabled={busy} onChange={e => setEmail(e.target.value)} /></label>

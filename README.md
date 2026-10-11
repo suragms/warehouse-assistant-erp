@@ -15,6 +15,14 @@ Built with **ASP.NET Core (.NET 10)** following Clean Architecture principles on
 ---
 
 
+## Responsive application UI
+
+Business lists use readable phone records and bounded desktop comparison tables. The all-pages audit covers 40 actual route samples, eight requested viewport sizes, both themes and nested workflows, with production APIs and permission rules retained. See the [per-route audit](docs/ALL_PAGES_RESPONSIVE_AUDIT.md) and [implementation, actual tests and device limits](docs/ALL_PAGES_RESPONSIVE_FIX_REPORT.md).
+
+## Independent report exports
+
+Settings → Export & Backup includes an Export Center for 18 independently downloadable PDF/CSV/XLSX reports. Reports use existing server services, tenant permissions and UTC periods; financial file access retains its existing Owner/SuperAdmin contract. Current stock, purchases, partners, lifecycle, dashboard, safe audit/backup metadata and real ready-model forecasts are covered. Barcode labels retain the existing individual/batch browser Print/Save PDF workflow. See [implemented report contracts and limits](docs/EXPORT_SYSTEM.md) and [actual verification results](docs/IMPLEMENTATION_AND_TEST_PLAN.md). Historical stock/payment/commission ledgers and external hardware/deployment qualifications remain explicitly documented gaps.
+
 ## Database recovery backups
 
 Settings → Export & Backup now includes encrypted PostgreSQL recovery archives for explicitly configured platform operators, persistent manual/daily/monthly jobs, protected retention and separately authorized recovery preparation. Existing business report exports remain available. Supply private persistent storage, PostgreSQL tools, backup keys and operator allowlists before enabling schedules; defaults grant no access. Live database overwrite is disabled. See [configuration and implementation](docs/BACKUP_RESTORE_DESIGN.md) and the [isolated recovery drill](docs/RECOVERY_DRILL.md). Deployment qualification and external asset/key recovery remain required.
@@ -284,3 +292,5 @@ npm run build
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+Frontend route, responsive UI and workflow verification: [docs/FRONTEND_UI_VERIFICATION.md](docs/FRONTEND_UI_VERIFICATION.md).

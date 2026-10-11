@@ -28,7 +28,7 @@ export function MediaTextInput({ kind, onText, disabled }: { kind: 'ocr' | 'voic
     } catch (e) { if (!controller.signal.aborted) setError(purchaseErrorMessage(e)); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   };
-  return <details className="border rounded p-3 my-3" onToggle={e => setOpen(e.currentTarget.open)}><summary className="cursor-pointer font-medium">{image ? 'Read an invoice image' : 'Transcribe a voice recording'}</summary>
+  return <details className="border rounded p-3 my-3 min-w-0" onToggle={e => setOpen(e.currentTarget.open)}><summary className="cursor-pointer font-medium">{image ? 'Read an invoice image' : 'Transcribe a voice recording'}</summary>
     {open && <div className="space-y-3 mt-3">
       <p className="text-sm">{image ? 'PNG or JPEG, up to 5 MiB and 16 megapixels. Sends the image to Gemini.' : 'WAV, WebM, MP3 or M4A, up to 5 MiB. Sends the recording to Groq.'} Review the returned text before using it.</p>
       {capabilities.isPending && <p role="status">Checking availability…</p>}
@@ -36,7 +36,7 @@ export function MediaTextInput({ kind, onText, disabled }: { kind: 'ocr' | 'voic
       {capabilities.data && !capabilities.data[kind] && <p role="status">This provider is not configured or is disabled. Enter text manually or ask your administrator to configure it.</p>}
       {capabilities.data?.[kind] && <>
         <label className="block">{image ? 'Invoice image' : 'Voice recording'}<input type="file" className="block w-full py-2" accept={image ? 'image/png,image/jpeg' : 'audio/wav,audio/webm,audio/mpeg,audio/mp4,audio/x-m4a'} disabled={busy || disabled} onChange={e => { setFile(e.target.files?.[0] ?? null); setText(''); setError(''); setConsent(false); }} /></label>
-        <label className="flex gap-2"><input type="checkbox" checked={consent} disabled={busy || disabled} onChange={e => setConsent(e.target.checked)} />I approve sending this file to the stated provider for extraction.</label>
+        <label className="flex gap-2"><input className="shrink-0" type="checkbox" checked={consent} disabled={busy || disabled} onChange={e => setConsent(e.target.checked)} />I approve sending this file to the stated provider for extraction.</label>
         <button type="button" className="border rounded p-3 disabled:opacity-50" disabled={busy || disabled || !file || !consent} onClick={extract}>{busy ? 'Extracting text…' : image ? 'Read image' : 'Transcribe recording'}</button>
       </>}
       {error && <p role="alert" className="text-red-700">{error}</p>}

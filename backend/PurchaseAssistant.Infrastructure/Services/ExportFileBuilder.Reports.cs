@@ -13,6 +13,15 @@ public record ReportTable(string Title, string BusinessName, DateTime GeneratedA
 
 public static partial class ExportFileBuilder
 {
+    private static string XmlText(string value)
+    {
+        var result = new StringBuilder();
+        // Validate Unicode scalars, retaining supplementary characters such as emoji as surrogate pairs.
+        foreach (var rune in value.EnumerateRunes())
+            if (rune.Value is 9 or 10 or 13 or >= 0x20 and <= 0xD7FF or >= 0xE000 and <= 0xFFFD or >= 0x10000 and <= 0x10FFFF)
+                result.Append(rune.ToString());
+        return result.ToString();
+    }
     public static string ReportText(object? value, string format = "text") => value switch
     {
         null => "-",
@@ -43,7 +52,7 @@ public static partial class ExportFileBuilder
                 const string infoNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
                 info.WriteStartElement("worksheet", infoNs); info.WriteStartElement("cols", infoNs); info.WriteStartElement("col", infoNs); info.WriteAttributeString("min", "1"); info.WriteAttributeString("max", "1"); info.WriteAttributeString("width", "110"); info.WriteAttributeString("customWidth", "1"); info.WriteEndElement(); info.WriteEndElement();
                 info.WriteStartElement("sheetData", infoNs);
-                foreach (var value in information) { info.WriteStartElement("row", infoNs); info.WriteStartElement("c", infoNs); info.WriteAttributeString("t", "inlineStr"); info.WriteAttributeString("s", "0"); info.WriteStartElement("is", infoNs); info.WriteElementString("t", infoNs, new string(value.Where(XmlConvert.IsXmlChar).ToArray())); info.WriteEndElement(); info.WriteEndElement(); info.WriteEndElement(); }
+                foreach (var value in information) { info.WriteStartElement("row", infoNs); info.WriteStartElement("c", infoNs); info.WriteAttributeString("t", "inlineStr"); info.WriteAttributeString("s", "0"); info.WriteStartElement("is", infoNs); info.WriteElementString("t", infoNs, XmlText(value)); info.WriteEndElement(); info.WriteEndElement(); info.WriteEndElement(); }
                 info.WriteEndElement(); info.WriteEndElement();
             }
             using var stream = zip.CreateEntry("xl/worksheets/sheet1.xml").Open();
@@ -67,7 +76,7 @@ public static partial class ExportFileBuilder
                     if (cell is DateTime date) xml.WriteElementString("v", ns, date.ToUniversalTime().ToOADate().ToString(CultureInfo.InvariantCulture));
                     else if (cell is DateOnly day) xml.WriteElementString("v", ns, day.ToDateTime(TimeOnly.MinValue).ToOADate().ToString(CultureInfo.InvariantCulture));
                     else if (cell is decimal or double or int or long) xml.WriteElementString("v", ns, Convert.ToString(cell, CultureInfo.InvariantCulture));
-                    else { xml.WriteAttributeString("t", "inlineStr"); xml.WriteStartElement("is", ns); xml.WriteStartElement("t", ns); xml.WriteAttributeString("xml", "space", null, "preserve"); xml.WriteString(new string((cell == null ? "" : ReportText(cell)).Where(XmlConvert.IsXmlChar).ToArray())); xml.WriteEndElement(); xml.WriteEndElement(); }
+                    else { xml.WriteAttributeString("t", "inlineStr"); xml.WriteStartElement("is", ns); xml.WriteStartElement("t", ns); xml.WriteAttributeString("xml", "space", null, "preserve"); xml.WriteString(XmlText(cell == null ? "" : ReportText(cell))); xml.WriteEndElement(); xml.WriteEndElement(); }
                     xml.WriteEndElement();
                 }
                 xml.WriteEndElement(); header = false;

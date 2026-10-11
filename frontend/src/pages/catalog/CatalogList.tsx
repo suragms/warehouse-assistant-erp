@@ -5,7 +5,8 @@ import { PermissionGate } from '../../auth/Guards';
 import { Plus, Search } from 'lucide-react';
 import { canPrintBarcode } from '../../lib/barcodes';
 import { BarcodeLabels } from '../../components/BarcodeTools';
-import { catalogApi } from '../../api/catalogApi';
+import { ResponsiveRecords, RecordCard, RecordFields, DataTableScroll } from '../../components/ui/ResponsiveRecords';
+import { catalogApi, type CatalogItem } from '../../api/catalogApi';
 import { catalogKeys, categoryKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Skeleton, ErrorState, Badge, Pagination } from '../../components/ui';
 
@@ -22,11 +23,18 @@ export default function CatalogList() {
     staleTime: 60 * 1000,
   });
 
-  const { data: categories } = useQuery({
+  const { data: categories, error: categoriesError, refetch: retryCategories } = useQuery({
     queryKey: categoryKeys.lists(),
     queryFn: () => catalogApi.getCategories(),
     staleTime: 5 * 60 * 1000,
   });
+
+  const labelSelection = (item: CatalogItem) => <input type="checkbox" aria-label={`Print label for ${item.name}`}
+    disabled={!item.isActive || !item.barcode || !canPrintBarcode(item.barcode)}
+    checked={selected.includes(item.id)} onChange={e => setSelected(values => e.target.checked ? [...values, item.id] : values.filter(id => id !== item.id))} />;
+  const itemActions = (item: CatalogItem) => <PermissionGate permission="catalog.edit"><Link to={`/catalog/items/${item.id}/edit`}>
+    <Button variant="ghost" size="sm" className="px-2">Edit</Button>
+  </Link></PermissionGate>;
 
   return (
     <div className="flex flex-col h-full">
@@ -43,12 +51,13 @@ export default function CatalogList() {
         }
       />
 
+      {categoriesError && <ErrorState message="Category filters could not be loaded." onRetry={() => void retryCategories()} />}
       {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-[#E2E8E6] mb-4 flex flex-col sm:flex-row gap-4 items-center">
         <div className="relative flex-1 w-full sm:max-w-xs">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <input
-            type="text"
+            aria-label="Search catalog items" type="text"
             placeholder="Search name, code, barcode..."
             value={search}
             onChange={(e) => { setSelected([]); setSearch(e.target.value); setPage(1); }}
@@ -57,7 +66,7 @@ export default function CatalogList() {
         </div>
         <div className="w-full sm:w-auto">
           <select
-            value={categoryId}
+            aria-label="Filter category" value={categoryId}
             onChange={(e) => { setSelected([]); setCategoryId(e.target.value); setPage(1); }}
             className="w-full px-3 py-2 border border-[#E2E8E6] rounded-lg text-sm bg-white outline-none focus:border-[#159A8A]"
           >
@@ -75,7 +84,7 @@ export default function CatalogList() {
       </div>
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E2E8E6] flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-x-auto flex-1">
+        <div className="min-w-0 flex-1">
           {isLoading ? (
             <div className="p-4 space-y-4">
               {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -89,6 +98,21 @@ export default function CatalogList() {
               <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or create a new item.</p>
             </div>
           ) : (
+            <ResponsiveRecords label="Catalog items" mobile={<div className="space-y-3">
+              {data?.data.map(item => <RecordCard key={item.id}
+                title={<Link to={`/catalog/items/${item.id}`} className="hover:text-[#159A8A] underline decoration-dotted underline-offset-4">{item.name}</Link>}
+                subtitle={item.itemCode} actions={itemActions(item)}>
+                <RecordFields fields={[
+                  { label: 'Category', value: item.categoryName || '—' },
+                  { label: 'Type', value: item.typeName || '—' },
+                  { label: 'Physical stock', value: `${item.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${item.defaultUnit}` },
+                  { label: 'Barcode', value: item.barcode || 'Not assigned' },
+                  { label: 'Status', value: <Badge variant={item.isActive ? 'green' : 'gray'}>{item.isActive ? 'Active' : 'Archived'}</Badge> },
+                ]} />
+                <label className="mt-3 flex min-h-11 items-center gap-3 text-sm">{labelSelection(item)} Select printable label</label>
+              </RecordCard>)}
+            </div>}>
+              <DataTableScroll label="Catalog items table" minWidth="64rem">
             <table className="min-w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-gray-50 text-[#475569] font-medium sticky top-0 z-10 border-b border-[#E2E8E6]">
                 <tr>
@@ -105,9 +129,7 @@ export default function CatalogList() {
               <tbody className="divide-y divide-[#E2E8E6]">
                 {data?.data.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3"><input type="checkbox" aria-label={`Print label for ${item.name}`}
-                      disabled={!item.isActive || !item.barcode || !canPrintBarcode(item.barcode)}
-                      checked={selected.includes(item.id)} onChange={e => setSelected(values => e.target.checked ? [...values, item.id] : values.filter(id => id !== item.id))} /></td>
+                    <td className="px-4 py-3">{labelSelection(item)}</td>
                     <td className="px-4 py-3 font-medium text-[#0F172A] max-w-[200px] truncate" title={item.name}>
                       <Link to={`/catalog/items/${item.id}`} className="hover:text-[#159A8A]">
                         {item.name}
@@ -132,14 +154,14 @@ export default function CatalogList() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link to={`/catalog/items/${item.id}/edit`}>
-                        <Button variant="ghost" size="sm" className="px-2">Edit</Button>
-                      </Link>
+                      {itemActions(item)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+              </DataTableScroll>
+            </ResponsiveRecords>
           )}
         </div>
         {data && data.meta.totalCount > 0 && (

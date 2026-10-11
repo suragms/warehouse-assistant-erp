@@ -4,7 +4,7 @@ import apiClient from '../api/apiClient';
 import { useAuthStore } from '../stores/authStore';
 vi.mock('../api/apiClient', () => ({ default: { get: vi.fn() } }));
 beforeEach(() => {
-  vi.clearAllMocks(); useAuthStore.setState({ user: { id: 'u', name: 'Owner', email: 'o@test.local', businesses: [], currentBusiness: { businessId: 'b', businessName: 'B', role: 'Owner', permissions: [] } } });
+  vi.clearAllMocks(); useAuthStore.setState({ isAuthenticated: true, user: { id: 'u', name: 'Owner', email: 'o@test.local', businesses: [], currentBusiness: { businessId: 'b', businessName: 'B', role: 'Owner', permissions: [] } } });
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:test') }); Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 });
@@ -15,6 +15,17 @@ it('uses a safe server filename and revokes its URL after download', async () =>
 });
 it('rejects an empty successful download and does not save it', async () => {
   vi.mocked(apiClient.get).mockResolvedValue({ data: new Blob([]), headers: {} }); await expect(downloadServerFile('/export', 'report.pdf')).rejects.toThrow('empty download'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+});
+it('rejects an unauthenticated session even when it retains stale business details', async () => {
+  useAuthStore.setState({ isAuthenticated: false });
+  await expect(downloadServerFile('/export', 'report.pdf')).rejects.toThrow('access is unavailable');
+  expect(apiClient.get).not.toHaveBeenCalled(); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+});
+it('discards delayed bytes when authentication ends before the response arrives', async () => {
+  let resolve!: (v: unknown) => void; vi.mocked(apiClient.get).mockReturnValue(new Promise(r => { resolve = r; }));
+  const pending = downloadServerFile('/export', 'report.pdf');
+  useAuthStore.setState({ isAuthenticated: false }); resolve({ data: new Blob(['PRIVATE']), headers: {} });
+  await expect(pending).rejects.toThrow('access changed'); expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
 });
 it('discards delayed data after business or role/permission changes', async () => {
   let resolve!: (v: unknown) => void; vi.mocked(apiClient.get).mockReturnValue(new Promise(r => { resolve = r; }));

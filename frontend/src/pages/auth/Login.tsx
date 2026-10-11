@@ -1,3 +1,4 @@
+import { ThemeToggle } from '../../components/ThemeProvider';
 import React, { useState } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -43,7 +44,8 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="relative isolate min-h-screen min-h-[100svh] bg-[#F7F9F6] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <main className="auth-page relative isolate min-h-screen min-h-[100svh] bg-[#F7F9F6] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="fixed top-3 right-3 z-10 rounded bg-white"><ThemeToggle /></div>
       <div aria-hidden="true" data-testid="login-background" className="absolute inset-0 -z-10 bg-cover bg-[center_65%] lg:right-1/2"
         style={{ backgroundImage: `url(${loginBackgroundUrl})` }}>
         <div className="absolute inset-0 bg-[#F7F9F6]/90 lg:hidden" />
@@ -53,9 +55,9 @@ export const Login: React.FC = () => {
           <div className="flex justify-center">
             <BrandLogo className="h-12 w-auto" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-[#0F172A]">
+          <h1 className="mt-6 text-center text-3xl font-extrabold text-[#0F172A]">
             Warehouse Assistant
-          </h2>
+          </h1>
           <p className="mt-2 text-center text-lg text-[#475569]">
             Harisree Agency
           </p>
@@ -64,7 +66,7 @@ export const Login: React.FC = () => {
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-[#E2E8E6]">
             {apiError && (
-              <div className="mb-4 rounded-md bg-red-50 p-4">
+              <div role="alert" className="mb-4 rounded-md bg-red-50 p-4">
                 <div className="flex">
                   <AlertCircle className="h-5 w-5 text-red-400" />
                   <div className="ml-3">
@@ -80,12 +82,12 @@ export const Login: React.FC = () => {
                 <div className="mt-1">
                   <input
                     {...register('email')}
-                    id="login-email"
+                    id="login-email" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'login-email-error' : undefined}
                     type="email"
                     autoComplete="username"
                     className="appearance-none block w-full px-3 py-2 border border-[#E2E8E6] rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#159A8A] focus:border-[#159A8A] sm:text-sm"
                   />
-                  {errors.email && <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>}
+                  {errors.email && <p role="alert" id="login-email-error" className="mt-2 text-sm text-red-600">{errors.email.message}</p>}
                 </div>
               </div>
 
@@ -94,12 +96,12 @@ export const Login: React.FC = () => {
                 <div className="mt-1">
                   <input
                     {...register('password')}
-                    id="login-password"
+                    id="login-password" aria-invalid={!!errors.password} aria-describedby={errors.password ? 'login-password-error' : undefined}
                     type="password"
                     autoComplete="current-password"
                     className="appearance-none block w-full px-3 py-2 border border-[#E2E8E6] rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#159A8A] focus:border-[#159A8A] sm:text-sm"
                   />
-                  {errors.password && <p className="mt-2 text-sm text-red-600">{errors.password.message}</p>}
+                  {errors.password && <p role="alert" id="login-password-error" className="mt-2 text-sm text-red-600">{errors.password.message}</p>}
                 </div>
               </div>
 
@@ -123,7 +125,7 @@ export const Login: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 export default Login;

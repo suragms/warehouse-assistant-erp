@@ -9,6 +9,7 @@ import { stockKeys } from '../../lib/queryKeys';
 import apiClient from '../../api/apiClient';
 import { useAuthStore } from '../../stores/authStore';
 import { hasPermission } from '../../auth/hasPermission';
+import { DataTableScroll, RecordCard, RecordFields, ResponsiveRecords } from '../../components/ui/ResponsiveRecords';
 
 type StockFilter = 'all' | 'low-stock' | 'out-of-stock';
 
@@ -59,7 +60,7 @@ export default function StockList() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg w-fit max-w-full">
         {tabs.map(tab => (
           <button
             key={tab.key}
@@ -80,7 +81,7 @@ export default function StockList() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <input
-          type="text"
+          aria-label="Search stock items" type="text"
           placeholder="Search items…"
           value={search}
           maxLength={200}
@@ -98,17 +99,24 @@ export default function StockList() {
       {options.isError && <p role="alert">Filter options are unavailable. Item search still works. <button className="underline" onClick={() => void options.refetch()}>Retry filters</button></p>}
       {filter !== 'all' && hasPermission(user, 'purchase.create') && <Link className="inline-block text-teal-700 underline py-2" to="/purchases/new">Review a reorder purchase</Link>}
       {isError && <p role="alert">Stock could not be loaded. <button className="underline" onClick={() => void refetch()}>Retry</button></p>}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <div className="bg-white min-w-0 rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <span className="animate-spin h-6 w-6 border-2 border-[#0E4F46] border-t-transparent rounded-full" />
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-100">
+          <ResponsiveRecords label="Inventory items" mobile={
+            <div className="space-y-3 p-3">
+              {(data?.data ?? []).map(item => <StockRecord key={item.id} item={item} />)}
+              {data?.data.length === 0 && <p className="py-8 text-center text-sm text-gray-500">No items found</p>}
+            </div>
+          }>
+          <DataTableScroll label="Inventory stock comparison" minWidth="60rem">
+          <table className="w-full divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
                 {['Item', 'System Stock', 'Physical', 'Reserved', 'Available', 'Reorder Level', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th key={h} className="px-4 py-3 whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {h}
                   </th>
                 ))}
@@ -127,12 +135,14 @@ export default function StockList() {
               )}
             </tbody>
           </table>
+          </DataTableScroll>
+          </ResponsiveRecords>
         )}
       </div>
 
       {/* Pagination */}
       {data && data.meta.totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-gray-500">
+        <div className="flex flex-wrap gap-3 items-center justify-between text-sm text-gray-500">
           <span>
             {(page - 1) * 50 + 1}–{Math.min(page * 50, data.meta.totalCount)} of {data.meta.totalCount}
           </span>
@@ -158,26 +168,44 @@ export default function StockList() {
   );
 }
 
+function StockRecord({ item }: { item: StockItem }) {
+  const status = item.availableStock <= 0 ? 'Out of stock' : item.availableStock <= item.reorderLevel ? 'Low stock' : 'Healthy';
+  return <RecordCard title={item.name} subtitle={item.itemCode} actions={
+    <Link to={`/inventory/${item.id}`} aria-label={`View stock for ${item.name}`} className="inline-flex items-center min-h-11 rounded-lg border border-[#0E4F46] px-3 py-2 text-sm font-medium text-[#0E4F46]">View stock</Link>
+  }>
+    <RecordFields fields={[
+      { label: 'Category', value: item.categoryName },
+      { label: 'Barcode', value: item.barcode || 'Not assigned' },
+      { label: 'System stock', value: `${item.systemStock} ${item.defaultUnit}` },
+      { label: 'Physical stock', value: `${item.physicalStock} ${item.defaultUnit}` },
+      { label: 'Reserved', value: `${item.reservedStock} ${item.defaultUnit}` },
+      { label: 'Available', value: <span className="font-semibold">{item.availableStock} {item.defaultUnit}</span> },
+      { label: 'Reorder level', value: `${item.reorderLevel} ${item.defaultUnit}` },
+      { label: 'Stock status', value: status },
+    ]} />
+  </RecordCard>;
+}
+
 function StockRow({ item }: { item: StockItem }) {
   const isOutOfStock = item.availableStock <= 0;
   const isLow = !isOutOfStock && item.availableStock <= item.reorderLevel;
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
-      <td className="px-4 py-3">
+      <td className="px-4 py-3 min-w-64 max-w-96 break-words">
         <p className="text-sm font-medium text-gray-900">{item.name}</p>
         <p className="text-xs text-gray-400">{item.itemCode}{item.barcode ? ` · ${item.barcode}` : ''}</p>
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
         {item.systemStock} {item.defaultUnit}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
         {item.physicalStock} {item.defaultUnit}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
         {item.reservedStock} {item.defaultUnit}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3 whitespace-nowrap">
         <span className={`text-sm font-semibold ${isOutOfStock ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-[#0E4F46]'}`}>
           {item.availableStock} {item.defaultUnit}
         </span>
@@ -188,7 +216,7 @@ function StockRow({ item }: { item: StockItem }) {
           <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Low</span>
         )}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
         {item.reorderLevel} {item.defaultUnit}
       </td>
       <td className="px-4 py-3">

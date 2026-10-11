@@ -37,5 +37,5 @@ for (const role of ['Owner', 'Manager', 'Staff'] as const) for (const [width, he
 }
 test('CSV failure stays actionable and does not show a false download', async ({ page }) => {
   await fixture(page, 'Owner', true); await page.goto('/inventory/all'); await page.getByRole('button', { name: 'Stock CSV', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('choose a smaller export'); await expect(page.getByRole('button', { name: 'Stock CSV', exact: true })).toBeEnabled();
+  await expect(page.getByRole('alert')).toContainText('Too large'); await expect(page.getByRole('button', { name: 'Stock CSV', exact: true })).toBeEnabled();
 });

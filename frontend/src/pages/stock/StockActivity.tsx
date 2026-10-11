@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ErrorState, Pagination } from '../../components/ui';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -14,15 +16,15 @@ const MOVEMENT_LABELS: Record<string, { label: string; color: string }> = {
 
 export default function StockActivity() {
   const { id } = useParams<{ id: string }>();
-  const page = 1;
+  const [page, setPage] = useState(1);
 
-  const { data: item } = useQuery({
+  const { data: item, isError: itemError, refetch: retryItem } = useQuery({
     queryKey: stockKeys.detail(id!),
     queryFn: () => stockApi.getDetail(id!),
     enabled: !!id,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: stockKeys.activity(id!, { page }),
     queryFn: () => stockApi.getActivity(id!, page, 50),
     enabled: !!id,
@@ -43,11 +45,12 @@ export default function StockActivity() {
         )}
       </div>
 
+      {itemError && <ErrorState message="Item details could not be loaded. Activity quantities have no verified unit until this loads." onRetry={() => void retryItem()} />}
       {isLoading ? (
         <div className="flex justify-center py-16">
           <span className="animate-spin h-6 w-6 border-2 border-[#0E4F46] border-t-transparent rounded-full" />
         </div>
-      ) : (
+      ) : isError ? <ErrorState message="Stock activity could not be loaded." onRetry={() => void refetch()} /> : (
         <div className="space-y-3">
           {(data?.data ?? []).length === 0 && (
             <p className="text-sm text-gray-400 py-8 text-center">No stock movements recorded yet.</p>
@@ -57,6 +60,7 @@ export default function StockActivity() {
           ))}
         </div>
       )}
+      {data?.meta && !isError && <Pagination page={page} pageSize={50} totalPages={data.meta.totalPages} totalCount={data.meta.totalCount} onPageChange={setPage} />}
     </div>
   );
 }
@@ -67,7 +71,7 @@ function MovementCard({ movement: m, unit }: { movement: StockMovement; unit: st
   const sign = delta > 0 ? '+' : delta < 0 ? '' : '±';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 min-w-0 break-words">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-xs font-medium px-2 py-0.5 rounded border ${meta.color}`}>
@@ -87,7 +91,7 @@ function MovementCard({ movement: m, unit }: { movement: StockMovement; unit: st
       {m.notes && (
         <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded p-2">{m.notes}</p>
       )}
-      <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+      <div className="mt-2 flex flex-wrap gap-2 items-center justify-between text-xs text-gray-400">
         <span>By {m.createdByName}</span>
         <span>{new Date(m.createdAt).toLocaleString()}</span>
       </div>

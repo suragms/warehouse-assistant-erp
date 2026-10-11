@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { allPagesViewports } from './all-pages-fixture';
 import { navigationFixture } from './navigation-fixture';
-for (const width of [390, 768, 1440]) test(`database backup settings, progress and recovery at ${width}px`, async ({ page }, info) => {
-  await page.setViewportSize({ width, height: 1000 }); const calls = await navigationFixture(page, 'SuperAdmin');
+for (const [width, height] of allPagesViewports) test(`database backup settings, progress and recovery at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height }); const calls = await navigationFixture(page, 'SuperAdmin');
   const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; const requests: string[] = [];
   const data = { canRecover: true, overview: { settings: { id: 1, revision: 'r1', dailyEnabled: false, dailyHour: 2, dailyMinute: 0, monthlyEnabled: false, monthlyDay: 31, monthlyHour: 3, monthlyMinute: 0, timeZone: 'Asia/Kolkata', dailyRetention: 14, monthlyRetention: 12, manualRetention: 10 }, health: { ready: true, destination: 'Protected server storage', durability: 'persistent', offsiteConfigured: false, warnings: ['offsite_copy_not_configured'] }, lastSuccessful: '2026-10-10T10:01:00Z', jobs: [{ id: 'verify-job', kind: 'verify', sourceId: id, status: 'succeeded', stage: 'Verified', createdAt: new Date().toISOString(), completedAt: new Date().toISOString(), sizeBytes: 0, verifiedAt: new Date().toISOString(), pinned: false, offsiteVerified: false, attempts: 1 }, { id, kind: 'manual', status: 'succeeded', stage: 'Encrypted archive ready', createdAt: '2026-10-10T10:00:00Z', completedAt: '2026-10-10T10:01:00Z', sha256: 'A'.repeat(64), sizeBytes: 1234, verifiedAt: '2026-10-10T10:01:00Z', pinned: false, offsiteVerified: false, attempts: 1 }], liveRestoreEnabled: false } };
   await page.route('**/exports/backup/logs', route => route.fulfill({ json: { items: [] } }));

@@ -1,3 +1,6 @@
+import { ErrorState } from '../../components/ui';
+import { DataTableScroll, RecordCard, RecordFields, ResponsiveRecords } from '../../components/ui/ResponsiveRecords';
+import axios from 'axios';
 import { ServerDownload } from '../../components/ServerDownload';
 import { formatMoney } from '../../lib/formatMoney';
 import { WhatsAppDelivery } from '../../components/WhatsAppDelivery';
@@ -6,7 +9,7 @@ import DamageReportSection from '../../components/damage/DamageReportSection';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { purchaseApi, PurchaseStatus, DeliveryState, type ReceivePurchaseDto } from '../../api/purchaseApi';
+import { purchaseApi, PurchaseStatus, DeliveryState, type ReceivePurchaseDto, type PurchaseItemDto } from '../../api/purchaseApi';
 import { purchaseErrorMessage } from '../../lib/purchaseValidation';
 import { useAuthStore } from '../../stores/authStore';
 import { purchaseKeys, stockKeys, catalogKeys, dashboardKeys, reportKeys, notificationKeys } from '../../lib/queryKeys';
@@ -28,10 +31,11 @@ export default function PurchaseDetail() {
   const can = (permission: string) => business?.role === 'Owner' || business?.role === 'Admin' || business?.role === 'SuperAdmin' || !!business?.permissions.includes(permission);
 
   const [success, setSuccess] = useState('');
+  const [receiveValidation, setReceiveValidation] = useState('');
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
   const [receiveNotes] = useState<Record<string, string>>({});
 
-  const { data: order, isLoading, error } = useQuery({
+  const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: purchaseKeys.detail(id!),
     queryFn: () => purchaseApi.getPurchaseById(id!),
     enabled: !!id,
@@ -77,7 +81,7 @@ export default function PurchaseDetail() {
     e.preventDefault();
     if (!order || receiveMutation.isPending) return;
 
-    let itemsToReceive = order.items.map(item => {
+    const itemsToReceive = order.items.map(item => {
       const delta = receiveQuantities[item.id] || 0;
       return {
         purchaseItemId: item.id,
@@ -86,28 +90,14 @@ export default function PurchaseDetail() {
       };
     }).filter(i => i.receivedQuantityDelta > 0);
 
-    if (itemsToReceive.length === 0) {
-      const remainingItems = order.items
-        .map(item => ({
-          purchaseItemId: item.id,
-          receivedQuantityDelta: Math.max(0, item.orderedQuantity - item.receivedQuantity),
-          notes: receiveNotes[item.id] || undefined
-        }))
-        .filter(i => i.receivedQuantityDelta > 0);
-
-      if (remainingItems.length > 0) {
-        itemsToReceive = remainingItems;
-      } else {
-        alert('All items in this purchase order have already been fully received.');
-        return;
-      }
-    }
+    if (itemsToReceive.length === 0) { setReceiveValidation('Enter a positive received quantity, or fill remaining quantities before saving.'); return; }
+    setReceiveValidation('');
 
     receiveMutation.mutate({ items: itemsToReceive, expectedVersion: order.version });
   };
 
   if (isLoading) return <div className="p-8 text-center text-slate-500">Loading purchase order details...</div>;
-  if (error || !order) return <div className="p-8 text-center text-rose-500">Purchase order not found.</div>;
+  if (error || !order) return <div className="space-y-4"><button className="underline py-2" onClick={() => navigate('/purchases/list')}>Back to purchases</button><ErrorState message={axios.isAxiosError(error) && error.response?.status === 404 ? 'Purchase order not found.' : 'Purchase details could not be loaded.'} onRetry={() => void refetch()} /></div>;
 
   const steps = [
     { status: PurchaseStatus.Draft, label: 'Draft' },
@@ -121,21 +111,51 @@ export default function PurchaseDetail() {
   const statusName = Object.keys(PurchaseStatus).find(key => PurchaseStatus[key as keyof typeof PurchaseStatus] === order.status);
   const deliveryStateName = Object.keys(DeliveryState).find(key => DeliveryState[key as keyof typeof DeliveryState] === order.deliveryState);
 
+  const canReceive = order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify');
+  const receiveControl = (item: PurchaseItemDto) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="number"
+        aria-label={`Receive quantity for ${item.catalogItemName}`}
+        min="0"
+        max={Math.max(0, item.orderedQuantity - item.receivedQuantity)}
+        step="any"
+        placeholder={Math.max(0, item.orderedQuantity - item.receivedQuantity).toString()}
+        value={receiveQuantities[item.id] !== undefined ? receiveQuantities[item.id] : ''}
+        onChange={(e) => handleReceiveChange(item.id, parseFloat(e.target.value) || 0)}
+        disabled={receiveMutation.isPending}
+        className="w-28 min-w-0 px-2.5 py-1.5 text-right text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      />
+      {item.orderedQuantity - item.receivedQuantity > 0 && (
+        <button
+          type="button"
+          onClick={() => handleReceiveChange(item.id, item.orderedQuantity - item.receivedQuantity)}
+          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-1 py-0.5 rounded hover:bg-indigo-50 transition-colors"
+          disabled={receiveMutation.isPending}
+          aria-label={`Fill remaining quantity for ${item.catalogItemName}`} title="Fill remaining"
+        >
+          Max
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl min-w-0 mx-auto space-y-6 break-words">
       {['Owner', 'Admin', 'SuperAdmin'].includes(business?.role ?? '') && order.status !== PurchaseStatus.Draft && order.status !== PurchaseStatus.Cancelled && <WhatsAppDelivery purchaseId={order.id} />}
       <ServerDownload path="/exports/reports/files/purchases.pdf" filename={`purchase_${order.id}.pdf`} label="Download this purchase PDF" params={{ purchaseId: order.id, start: order.createdAt, end: order.createdAt }} />
+      {receiveValidation && <p role="alert" className="text-red-700">{receiveValidation}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3">
           <button
-            onClick={() => navigate('/purchases')}
-            className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg border border-slate-200 shadow-sm transition-colors"
+            aria-label="Back to purchases" onClick={() => navigate('/purchases')}
+            className="shrink-0 p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg border border-slate-200 shadow-sm transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{order.orderNumber}</h1>
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 uppercase tracking-wide">
                 {statusName}
@@ -146,7 +166,7 @@ export default function PurchaseDetail() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {order.status === PurchaseStatus.Draft && can('purchase.edit') && (
             <>
               <button
@@ -250,24 +270,44 @@ export default function PurchaseDetail() {
 
       {/* Line Items & Receiving Section */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-wrap gap-3 items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Order Items & Inventory Receipt</h2>
           <span className="text-xs text-slate-500">
-            All receipts automatically route through StockService to maintain inventory audit logs.
+            Received quantities update inventory and create stock activity records.
           </span>
         </div>
 
         <form onSubmit={handleReceiveSubmit}>
-          <div className="overflow-x-auto">
+          <ResponsiveRecords label="Purchase items and receipts" mobile={
+            <div className="p-3 space-y-3">
+              {canReceive && order.items.some(i => i.orderedQuantity - i.receivedQuantity > 0) &&
+                <button type="button" onClick={handleFillAllRemaining} disabled={receiveMutation.isPending} className="min-h-11 px-3 py-2 rounded-lg border border-indigo-200 text-sm font-medium text-indigo-700">Fill All</button>}
+              {order.items.map(item => <RecordCard key={item.id} title={item.catalogItemName} subtitle={item.itemCode}>
+                <RecordFields fields={[
+                  { label: 'Ordered', value: `${item.orderedQuantity}${item.unit ? ` ${item.unit}` : ''}` },
+                  { label: 'Received', value: `${item.receivedQuantity}${item.unit ? ` ${item.unit}` : ''}` },
+                  { label: 'Unit price', value: formatMoney(item.unitPrice) },
+                  { label: 'Line total', value: <span className="font-semibold">{formatMoney(item.lineTotal)}</span> },
+                ]} />
+                {canReceive && <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                  <p className="text-sm font-medium text-slate-700">Receive now (additional quantity)</p>
+                  {receiveControl(item)}
+                  <p className="text-xs text-slate-500">Remaining: {Math.max(0, item.orderedQuantity - item.receivedQuantity)} {item.unit}</p>
+                </div>}
+              </RecordCard>)}
+              {order.items.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No order items.</p>}
+            </div>
+          }>
+          <DataTableScroll label="Purchase items and receipt comparison" minWidth={canReceive ? '64rem' : '48rem'}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-4">Item Code & Name</th>
-                  <th className="py-3 px-4 text-right">Ordered</th>
-                  <th className="py-3 px-4 text-right">Received</th>
-                  <th className="py-3 px-4 text-right">Unit Price</th>
-                  <th className="py-3 px-4 text-right">Line Total</th>
-                  {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
+                  <th className="py-3 px-4 whitespace-nowrap">Item Code & Name</th>
+                  <th className="py-3 px-4 whitespace-nowrap text-right">Ordered</th>
+                  <th className="py-3 px-4 whitespace-nowrap text-right">Received</th>
+                  <th className="py-3 px-4 whitespace-nowrap text-right">Unit Price</th>
+                  <th className="py-3 px-4 whitespace-nowrap text-right">Line Total</th>
+                  {canReceive && (
                     <th className="py-3 px-4 bg-indigo-50/50 text-indigo-900 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <span>Receive Now (Delta)</span>
@@ -288,62 +328,41 @@ export default function PurchaseDetail() {
               <tbody className="divide-y divide-slate-200 text-sm">
                 {order.items.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 min-w-56 max-w-80 break-words">
                       <div className="font-semibold text-slate-900">{item.itemCode}</div>
                       <div className="text-xs text-slate-500">{item.catalogItemName}</div>
                     </td>
-                    <td className="py-3 px-4 text-right font-medium text-slate-900">{item.orderedQuantity}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-emerald-600">{item.receivedQuantity}</td>
-                    <td className="py-3 px-4 text-right text-slate-700">{formatMoney(item.unitPrice)}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatMoney(item.lineTotal)}</td>
-                    {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
+                    <td className="py-3 px-4 whitespace-nowrap text-right font-medium text-slate-900">{item.orderedQuantity}</td>
+                    <td className="py-3 px-4 whitespace-nowrap text-right font-semibold text-emerald-600">{item.receivedQuantity}</td>
+                    <td className="py-3 px-4 whitespace-nowrap text-right text-slate-700">{formatMoney(item.unitPrice)}</td>
+                    <td className="py-3 px-4 whitespace-nowrap text-right font-semibold text-slate-900">{formatMoney(item.lineTotal)}</td>
+                    {canReceive && (
                       <td className="py-3 px-4 bg-indigo-50/30 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <input
-                            type="number"
-                            aria-label={`Receive quantity for ${item.catalogItemName}`}
-                            min="0"
-                            max={Math.max(0, item.orderedQuantity - item.receivedQuantity)}
-                            step="any"
-                            placeholder={Math.max(0, item.orderedQuantity - item.receivedQuantity).toString()}
-                            value={receiveQuantities[item.id] !== undefined ? receiveQuantities[item.id] : ''}
-                            onChange={(e) => handleReceiveChange(item.id, parseFloat(e.target.value) || 0)}
-                            className="w-24 px-2.5 py-1.5 text-right text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          {item.orderedQuantity - item.receivedQuantity > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleReceiveChange(item.id, item.orderedQuantity - item.receivedQuantity)}
-                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-1 py-0.5 rounded hover:bg-indigo-50 transition-colors"
-                              title="Fill remaining"
-                            >
-                              Max
-                            </button>
-                          )}
-                        </div>
+                        {receiveControl(item)}
                       </td>
                     )}
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </DataTableScroll>
+          </ResponsiveRecords>
 
           {/* Totals & Submit Receive Action */}
-          <div className="p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="space-y-1 text-sm text-slate-600">
               <div>Subtotal: <span className="font-semibold text-slate-900">{formatMoney(order.subtotal)}</span></div>
               <div>Tax: <span className="font-semibold text-slate-900">{formatMoney(order.taxTotal)}</span></div>
               <div className="text-base font-bold text-slate-900">Grand Total: <span className="text-indigo-600">{formatMoney(order.grandTotal)}</span></div>
             </div>
 
-            {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
+            {canReceive && (
               <button
                 type="submit"
                 disabled={receiveMutation.isPending || order.items.every(i => i.receivedQuantity >= i.orderedQuantity)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors disabled:opacity-50"
+                className="max-w-full inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-sm transition-colors disabled:opacity-50"
               >
-                <PackageCheck className="w-5 h-5" />
+                <PackageCheck className="w-5 h-5 shrink-0" />
                 {order.items.every(i => i.receivedQuantity >= i.orderedQuantity) ? 'All Items Already Received' : 'Commit Received Items to Stock'}
               </button>
             )}
@@ -363,7 +382,7 @@ export default function PurchaseDetail() {
       <section className="bg-white p-5 rounded-xl border border-slate-200 space-y-3" aria-label="Purchase activity">
         <h2 className="font-semibold text-slate-900">Purchase activity</h2>
         {activity.isLoading ? <p className="text-sm text-slate-500">Loading activity…</p> : activity.error ?
-          <p role="alert" className="text-sm text-red-700">{purchaseErrorMessage(activity.error)}</p> :
+          <ErrorState message={purchaseErrorMessage(activity.error)} onRetry={() => void activity.refetch()} /> :
           <ul className="space-y-2 text-sm text-slate-600">{activity.data?.length ? activity.data.map(event =>
             <li key={event.id}>{event.eventType.replace(/^Purchase/, '').replace(/([a-z])([A-Z])/g, '$1 $2')} · {new Date(event.createdAt).toLocaleString()}</li>) :
             <li>No recorded activity yet.</li>}</ul>}
