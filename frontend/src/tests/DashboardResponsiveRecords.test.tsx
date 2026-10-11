@@ -78,3 +78,45 @@ it('preserves permissions and hides financial data and creation from a stock-onl
   expect(screen.queryByRole('button', { name: 'New Purchase' })).not.toBeInTheDocument();
   expect(screen.queryByText('₹123.45')).not.toBeInTheDocument();
 });
+
+it('renders operational alerts with severity badges and navigable links', async () => {
+  const alertData = {
+    ...data,
+    operationalAlerts: [
+      { id: 'al1', type: 'OutOfStock', title: 'Critical Stock Alert', message: 'Item is completely exhausted', referenceId: 'c1', referenceType: 'CatalogItem' },
+      { id: 'al2', type: 'LowStock', title: 'Low Stock Warning', message: 'Item is below reorder threshold', referenceId: 'c2', referenceType: 'CatalogItem' },
+    ],
+    deliveryMetrics: { draftPurchases: 2, confirmedPurchases: 4, dispatchedPurchases: 1, arrivedPurchases: 1, verificationPending: 1 },
+  };
+  vi.mocked(dashboardApi.getDashboard).mockResolvedValue(alertData as never);
+  show(false);
+
+  expect(await screen.findByText('Operational Alerts')).toBeVisible();
+  expect(screen.getByText('Critical Stock Alert')).toBeVisible();
+  expect(screen.getByText('Critical')).toBeVisible();
+  expect(screen.getByText('Low Stock Warning')).toBeVisible();
+  expect(screen.getByText('Warning')).toBeVisible();
+
+  // Delivery pipeline metrics rendered
+  expect(screen.getByText('Procurement Delivery Pipeline')).toBeVisible();
+  expect(screen.getByText('Inventory Stock Health')).toBeVisible();
+});
+
+it('renders operational alerts safely when backend serializes alert types as numbers', async () => {
+  const numericAlertData = {
+    ...data,
+    operationalAlerts: [
+      { type: 2, title: 'Critical: Out of Stock', message: '4 items zero stock', timestamp: '2026-10-11T12:00:00Z' },
+      { type: 1, title: 'Warning: Low Stock', message: '2 items below threshold', timestamp: '2026-10-11T12:00:00Z' },
+    ],
+  };
+  vi.mocked(dashboardApi.getDashboard).mockResolvedValue(numericAlertData as never);
+  show(true);
+
+  expect(await screen.findByText('Operational Alerts')).toBeVisible();
+  expect(screen.getByText('Critical: Out of Stock')).toBeVisible();
+  expect(screen.getByText('Critical')).toBeVisible();
+  expect(screen.getByText('Warning: Low Stock')).toBeVisible();
+  expect(screen.getByText('Warning')).toBeVisible();
+});
+

@@ -23,7 +23,7 @@ export interface DashboardMetricsDto {
     verificationPending: number;
   };
   operationalAlerts: Array<{
-    type: string;
+    type: string | number;
     title: string;
     message: string;
     timestamp: string;
